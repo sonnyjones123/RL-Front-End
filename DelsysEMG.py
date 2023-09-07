@@ -73,3 +73,23 @@ class DelsysEMG:
         Checks current status of Delsys EMG system.
         """
         return self.status
+    
+    def connectSensors(self):
+        """
+        Connects sensors to the Delsys EMG system.
+
+        To connect the sensors, the function runs through the TrigBase.PairSensor()
+        command. This will put the system in pairing mode and will continue running
+        until a sensor is paired. We can continue to pair additional sensors after.
+        """
+        # Calling Pairing Function
+        print("Starting Sensor Pairing...")
+        self.TrigBase.PairSensor()
+
+        print("Awaiting Sensor Pair Request...")
+
+        while self.TrigBase.CheckPairStatus():
+            continue
+
+
+
