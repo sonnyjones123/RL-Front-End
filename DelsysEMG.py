@@ -43,11 +43,17 @@ class DelsysEMG:
         """
         # Creating base class instance from Delsys API
         base = TrignoBase()
-        self.TrigBase = base.BaseInstance()
+        self.TrigBase = base.BaseInstance
 
         # Validating connection to Delsys Base 
         print("Validating TrignoBase connection...")
         self.TrigBase.ValidateBase(self.key, self.license)
+
+        try: 
+            self.status = self.TrigBase.GetPipelineState()
+            print("TrignoBase Connection Valid")
+        except:
+            print("TrignoBase Not Connected")
 
     def checkStatus(self):
         """
@@ -57,7 +63,13 @@ class DelsysEMG:
             DelsysEMG.check_status()
         """
         # Checking the status of the Delsys EMG system
-        self.status = self.TrignoBase.GetPipelineState()
+        self.status = self.TrigBase.GetPipelineState()
 
         # Printing Current Status
         print(f"Current Status: {self.status}")
+
+    def currentStatus(self):
+        """
+        Checks current status of Delsys EMG system.
+        """
+        return self.status
