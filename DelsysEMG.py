@@ -74,7 +74,7 @@ class DelsysEMG:
         """
         return self.status
     
-    def connectSensor(self, num_sensors):
+    def connectSensors(self, numSensors):
         """
         Connects sensors to the Delsys EMG system.
 
@@ -87,17 +87,58 @@ class DelsysEMG:
         print("Awaiting Sensor Pair Request...")
 
         # Looping through num of sensors
-        for num in range(num_sensors):
+        for num in range(numSensors):
             # Calling Pairing Function
             self.TrigBase.PairSensor()
             # CheckPairStatus will be false when sensor is paired
             while self.TrigBase.CheckPairStatus():
                 continue
             
-            print(f"Sensor {num} paired")
+            print(f"Sensor {num + 1} paired")
 
+        # Scanning for Paired Sensors
         print("Scanning for paired sensors...")
         self.TrigBase.ScanSensors()
 
+        # Getting Sensor names and length of sensor list
         self.sensorList = self.TrigBase.GetSensorNames()
+        self.SensorsFound = len(self.sensorList)
 
+        # Printing Num of Sensors and Sensor List
+        print(f"Sensors Found: {self.SensorsFound}")
+        [print(sensor) for sensor in self.sensorList]
+
+    def selectAllSensors(self):
+        """
+        Selects all sensors conencted to the Delsys EMG System for streaming.
+        """
+        # Selecting all sensors.
+        self.TrigBase.SelectAllSensors()
+
+    def selectSensor(self, sensorNum):
+        """
+        Selects individual sensor at specifided sensor number for streaming.
+        NOTE: when refering to sensors, the sensors start at 0.
+        """
+        # Selecting individual sensor at index sensor_num.
+        self.TrigBase.SelectSensor(sensorNum)
+
+    def availableSensorModes(self, sensorNum):
+        """
+        Outputs a string of the current sensor modes available for sensor.
+        """
+        # Getting sensor modes.
+        self.modeList = self.TrigBase.AvailibleSensorModes(sensorNum)
+        # Printing sensor mode list.
+
+        for i, mode in enumerate(self.modeList):
+            print(f"Mode {i} : {mode}")
+
+    def setSampleMode(self, sensorNum, sampleMode):
+        """
+        Setting sensor sensorNum to sampleMode.
+        """
+        # Setting sensor sensorNum to sampleMode.
+        self.TrigBase.SetSampleMode(sensorNum, sampleMode)
+
+        
