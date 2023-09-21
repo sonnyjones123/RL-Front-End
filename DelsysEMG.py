@@ -1,12 +1,19 @@
 import sys
 import platform
+import numpy as np
+
+import clr
+clr.AddReference("System.Collections")
+
+from System.Collections.Generic import *
 
 # Adding path for current computer
-# Please add your computer name and path ot the Python API folder for delsys.
+# Please add your computer name and path to the Python API folder for delsys.
 if (platform.node() == "Sonny_ThinkPad"):
     sys.path.insert(0, "C:/Users/sonny/Box/NeuroRoboticsLab/NERVES Lab/Equipment Manuals/Delsys/Example-Applications-main/Python")
 
-from AeroPy.TrignoBase import TrignoBase
+from AeroPy.TrignoBase import *
+from AeroPy.DataManager import *
 
 class DelsysEMG:
     """
@@ -33,7 +40,8 @@ class DelsysEMG:
         # a new key and license if the following no longer work. 
         self.key = "MIIBKjCB4wYHKoZIzj0CATCB1wIBATAsBgcqhkjOPQEBAiEA/////wAAAAEAAAAAAAAAAAAAAAD///////////////8wWwQg/////wAAAAEAAAAAAAAAAAAAAAD///////////////wEIFrGNdiqOpPns+u9VXaYhrxlHQawzFOw9jvOPD4n0mBLAxUAxJ02CIbnBJNqZnjhE50mt4GffpAEIQNrF9Hy4SxCR/i85uVjpEDydwN9gS3rM6D0oTlF2JjClgIhAP////8AAAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBA0IABCs6LASqvLpxqpvzLA8QbLmUDDDlOqD54JhLUEadv+oAgG8JVVDtI0qMO2V2PQiXoKsY33+ea/Jtp12wDA3847g="
         self.license = "<License>  <Id>756caf49-ab7f-407f-970e-89f5933fa494</Id>  <Type>Standard</Type>  <Quantity>10</Quantity>  <LicenseAttributes>    <Attribute name='Software'></Attribute>  </LicenseAttributes>  <ProductFeatures>    <Feature name='Sales'>True</Feature>    <Feature name='Billing'>False</Feature>  </ProductFeatures>  <Customer>    <Name>Sonny Jones</Name>    <Email>sonny.jones@utah.edu</Email>  </Customer>  <Expiration>Fri, 05 Sep 2031 04:00:00 GMT</Expiration>  <Signature>MEUCIDx5YfJ4042zldgXWz+IJi//Z+ZQQ0b0LZoYIjcRm3BvAiEAjXJD2kb1fLqcFLD7/fAOoWOjRHANREyQwjDpDlaLYOg=</Signature></License>"
-        
+        self.data = []
+
     def connect(self):
         """ 
         Initializes the connection to the Delsys EMG system.
@@ -60,7 +68,7 @@ class DelsysEMG:
         Checks the pipline status of the Delsys EMG system.
             
         Usage:
-            DelsysEMG.check_status()
+            DelsysEMG.checkStatus()
         """
         # Checking the status of the Delsys EMG system
         self.status = self.TrigBase.GetPipelineState()
@@ -81,6 +89,8 @@ class DelsysEMG:
         To connect the sensors, the function runs through the TrigBase.PairSensor()
         command. This will put the system in pairing mode and will continue running
         until a sensor is paired. We can continue to pair additional sensors after.
+        Sensors will quickly flash green when pairing is successful. Alternating 
+        green and yellow flashing indiccates waiting status.
         """
     
         print("Starting Sensor Pairing...")
@@ -101,12 +111,17 @@ class DelsysEMG:
         self.TrigBase.ScanSensors()
 
         # Getting Sensor names and length of sensor list
-        self.sensorList = self.TrigBase.GetSensorNames()
-        self.SensorsFound = len(self.sensorList)
+        sensorList = self.TrigBase.GetSensorNames()
+        # Putting sensor numbers and list in dict.
+        self.sensorList = {}
+        for i in range(len(sensorList)):
+            self.sensorList[i] = sensorList[i]
+
+        self.sensorsFound = len(sensorList)
 
         # Printing Num of Sensors and Sensor List
-        print(f"Sensors Found: {self.SensorsFound}")
-        [print(sensor) for sensor in self.sensorList]
+        print(f"Sensors Found: {self.sensorsFound}")
+        [print(sensor) for sensor in sensorList]
 
     def selectAllSensors(self):
         """
@@ -134,11 +149,131 @@ class DelsysEMG:
         for i, mode in enumerate(self.modeList):
             print(f"Mode {i} : {mode}")
 
+    def getCurrentSensorMode(self, sensorNum):
+        """
+        Will get current sensor mode from sensor sensorNum.
+        """
+        # Getting current sensor mode.
+        print(self.TrigBase.GetCurrentSensorMode(sensorNum))
+
     def setSampleMode(self, sensorNum, sampleMode):
         """
         Setting sensor sensorNum to sampleMode.
+        
+        Inputs:
+            sensorNum (int): The number of the sensor.
+            sampleMode (str): The sample mode to be set.
+
+        Sample Mode List can be found in the Delsys Manual folder under
+        Delsys Sample Modes.
         """
         # Setting sensor sensorNum to sampleMode.
         self.TrigBase.SetSampleMode(sensorNum, sampleMode)
 
+    def configure(self, startTrigger = False, stopTrigger = False):
+        """
+        Configures the Delsys EMG for streaming. Will set the current pipeline state to armed.
+        To enable a start and stop trigger, set the startTrigger and stopTrigger parameters to True.
+        Then you can use the IsWaitingForStartTrigger() and IsWaitingForStopTrigger() functions to
+        enable and stop streaming.
+        """
+        # Creating data manager class
+        self.DataHandler = DataKernel(self.TrigBase)
+        self.DataHandler.packetCount = 0
+        self.DataHandler.allcollectiondata = [[]]
+
+        # Checking to see if Delsys EMG is in connected state.
+        if self.TrigBase.GetPipelineState() == "Connected":
+            # Configuring Delsys EMG for streaming.
+            self.TrigBase.Configure(starttrigger = startTrigger, stoptrigger = stopTrigger)
+            print("Pipeline Armed")
         
+            # Updated Pipeline State
+            self.status = self.TrigBase.GetPipelineState()
+            print(self.status)
+
+            # Creating variables
+            self.channelCount = 0
+            self.channelNames = []
+            self.sampleRates = []
+            self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
+
+            # Looping through sensor list
+            for sensorNum in range(self.sensorsFound):
+                # Selecting sensor object
+                selectedSensor = self.TrigBase.GetSensorObject(sensorNum)
+                # Checking to see if sensor channels are greated than 0.
+                if len(selectedSensor.TrignoChannels) > 0:
+                    # Looping through num of channels in sensor sensorNum.
+                    for channel in range(len(selectedSensor.TrignoChannels)):
+                        self.channelCount += 1
+                        self.DataHandler.allcollectiondata.append([])
+                        self.channelNames.append(selectedSensor.TrignoChannels[channel].Name)
+                        self.sampleRates.append(selectedSensor.TrignoChannels[channel].SampleRate)
+                        self.samplesPerFrame.append(selectedSensor.TrignoChannels[channel].SamplesPerFrame)
+
+    def startDataCollection(self):
+        # Starting Data Collection
+        if self.TrigBase.GetPipelineState() == "Armed":
+            self.TrigBase.Start()
+            print('Data Collection Started')
+        else:
+            print("Pipeline not in armed state.")
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
+
+    def getData(self):
+        """
+        Checking data queue for incoming data packets. If there are data packets, will update 
+        our current data buffer with the incoming data packets.
+        """    
+        # Checking Data Queue
+        dataReady = self.TrigBase.CheckDataQueue()
+        if dataReady:
+            DataOut = self.TrigBase.PollData()
+            outArr = [[] for i in range(len(DataOut.Keys))]
+            keys = []
+            for i in DataOut.Keys:
+                keys.append(i)
+            for j in range(len(DataOut.Keys)):
+                outBuf = DataOut[keys[j]]
+                outArr[j].append(np.asarray(outBuf, dtype='object'))
+            return outArr
+        else:
+            return None
+            
+
+    def processData(self):
+        """
+        The checkData functino outputs a System.Collections.Generic dictionary object. This function
+        will clean up the data from the checkData function and output it into a Python dictionary.
+        """
+        outArr = self.getData()
+        if outArr is not None:
+            for i in range(len(outArr)):
+                self.DataHandler.allcollectiondata[i].extend(outArr[i][0].tolist())
+            try:
+                for i in range(len(outArr[0])):
+                    if np.asarray(outArr[0]).ndim == 1:
+                        self.data.append(list(np.asarray(outArr, dtype='object')[0]))
+                    else:
+                        self.data.append(list(np.asarray(outArr, dtype='object')[:, i]))
+                try:
+                    self.DataHandler.packetCount += len(outArr[0])
+                    self.DataHandler.sampleCount += len(outArr[0][0])
+                except:
+                    pass
+            except IndexError:
+                pass
+
+    def stopDataCollection(self):
+        """
+        Stops data collection.
+        """
+        # Stopping data collection.
+        self.TrigBase.Stop()
+        print('Data Collection Complete')
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
