@@ -1,9 +1,10 @@
-import time
+# Importing Dependencies
 from DelsysEMG import DelsysEMG
+from UDPBackGround import *
+from System.Collections.Generic import *
 
 import clr
 clr.AddReference("System.Collections")
 
-from System.Collections.Generic import *
-
+# Setting up DelsysEMG Class
 DelsysEMG = DelsysEMG()
