@@ -5,11 +5,12 @@ This function sets up the background task on its own thread so it doesn't bog do
 import queue
 import threading
 import socket
+import time
 
 def readUDP(queue):
     while True:
         # Setting UDP IP and Port Addresses
-        UDP_IP = "127.0.0.1"
+        UDP_IP = "10.16.83.28"
         UDP_PORT = 5005
 
         # Initiating Socket
@@ -21,12 +22,42 @@ def readUDP(queue):
         data, addr = sock.recvfrom(1024) # Buffer Size is 1024 Bytes
         queue.put(data)
 
-result_queue = queue.Queue()
+def sendDelsysStatus(MESSAGE, UDP_PORT):
+    UDP_IP = "10.16.83.28"
+    MESSAGE = bytes(DelsysStatus, 'utf-8')
+ 
+    sock = socket.socket(socket.AF_INET, # Internet
+                         socket.SOCK_DGRAM) # UDP
+    sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
 
-listenUDP = threading.Thread(target = readUDP, args = (result_queue,))
+commandQueue = queue.Queue()
+
+listenUDP = threading.Thread(target = readUDP, args = (commandQueue,))
 listenUDP.start()
 
+# Importing Dependencies
+from DelsysEMG import DelsysEMG
+from System.Collections.Generic import *
+
+import clr
+clr.AddReference("System.Collections")
+
+# Setting up DelsysEMG Class
+DelsysEMG = DelsysEMG()
+DelsysStatus = "Off"
+sendDelsysStatus(DelsysStatus, 9005)
+
 while listenUDP.is_alive():
-    if not result_queue.empty():
-        results = result_queue.get()
-        print(f"Data: {results}")
+    if not commandQueue.empty():
+        command = commandQueue.get()
+        command = command.decode('utf-8')
+        
+        command = "DelsysEMG." + command
+        exec(command)
+
+    if not DelsysEMG.status == DelsysStatus:
+        DelsysStatus = DelsysEMG.status
+        sendDelsysStatus(DelsysStatus, 9005)
+
+    # Waiting Until Next Call
+    time.sleep(0.033)
