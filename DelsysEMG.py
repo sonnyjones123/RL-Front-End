@@ -9,7 +9,9 @@ from System.Collections.Generic import *
 
 # Adding path for current computer
 # Please add your computer name and path to the Python API folder for delsys.
-if (platform.node() == "Sonny_ThinkPad"):
+if (platform.node() == "Garangatan_Comp"):
+    sys.path.insert(0, "C:/Users/grang/Box/NeuroRoboticsLab/NERVES Lab/Equipment Manuals/Delsys/Example-Applications-main/Python")
+elif (platform.node() == "Sonny_ThinkPad"):
     sys.path.insert(0, "C:/Users/sonny/Box/NeuroRoboticsLab/NERVES Lab/Equipment Manuals/Delsys/Example-Applications-main/Python")
 
 from AeroPy.TrignoBase import *
@@ -41,6 +43,9 @@ class DelsysEMG:
         self.key = "MIIBKjCB4wYHKoZIzj0CATCB1wIBATAsBgcqhkjOPQEBAiEA/////wAAAAEAAAAAAAAAAAAAAAD///////////////8wWwQg/////wAAAAEAAAAAAAAAAAAAAAD///////////////wEIFrGNdiqOpPns+u9VXaYhrxlHQawzFOw9jvOPD4n0mBLAxUAxJ02CIbnBJNqZnjhE50mt4GffpAEIQNrF9Hy4SxCR/i85uVjpEDydwN9gS3rM6D0oTlF2JjClgIhAP////8AAAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBA0IABCs6LASqvLpxqpvzLA8QbLmUDDDlOqD54JhLUEadv+oAgG8JVVDtI0qMO2V2PQiXoKsY33+ea/Jtp12wDA3847g="
         self.license = "<License>  <Id>756caf49-ab7f-407f-970e-89f5933fa494</Id>  <Type>Standard</Type>  <Quantity>10</Quantity>  <LicenseAttributes>    <Attribute name='Software'></Attribute>  </LicenseAttributes>  <ProductFeatures>    <Feature name='Sales'>True</Feature>    <Feature name='Billing'>False</Feature>  </ProductFeatures>  <Customer>    <Name>Sonny Jones</Name>    <Email>sonny.jones@utah.edu</Email>  </Customer>  <Expiration>Fri, 05 Sep 2031 04:00:00 GMT</Expiration>  <Signature>MEUCIDx5YfJ4042zldgXWz+IJi//Z+ZQQ0b0LZoYIjcRm3BvAiEAjXJD2kb1fLqcFLD7/fAOoWOjRHANREyQwjDpDlaLYOg=</Signature></License>"
         self.data = []
+        self.sensorNames = [75503, 75548, 75596, 75587, 75467, 75672, 75641, 75461, 75148, 75268, 75247, 75406]
+        self.sensorDict = {}
+        self.numSensors = 16
         self.status = "Off"
 
     def connect(self):
@@ -60,9 +65,12 @@ class DelsysEMG:
 
         try: 
             self.status = self.TrigBase.GetPipelineState()
+            #self.status = "Active"
             print("TrignoBase Connection Valid")
         except:
+            self.status = "Connection Refused"
             print("TrignoBase Not Connected")
+        
 
     def checkStatus(self):
         """
@@ -98,31 +106,35 @@ class DelsysEMG:
         print("Awaiting Sensor Pair Request...")
 
         # Looping through num of sensors
-        for num in range(numSensors):
+        for num in range(int(numSensors)):
             # Calling Pairing Function
             self.TrigBase.PairSensor()
             # CheckPairStatus will be false when sensor is paired
             while self.TrigBase.CheckPairStatus():
                 continue
             
-            print(f"Sensor {num + 1} paired")
+            # Adding sensorNames and sensorNum to dict
+            for sensorName in self.TrigBase.GetSensorNames():
+                if sensorName in self.sensorDict.keys():
+                    pass
+                else:
+                    tempSensorName = sensorName.split(" ")[0]
+                    self.sensorDict[int(tempSensorName)] = num
+
+            tempSensorKey = list(self.sensorDict.keys())
+            print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
 
         # Scanning for Paired Sensors
         print("Scanning for paired sensors...")
         self.TrigBase.ScanSensors()
 
-        # Getting Sensor names and length of sensor list
-        sensorList = self.TrigBase.GetSensorNames()
-        # Putting sensor numbers and list in dict.
-        self.sensorList = {}
-        for i in range(len(sensorList)):
-            self.sensorList[i] = sensorList[i]
-
-        self.sensorsFound = len(sensorList)
-
+        # Getting Number of Sensors
+        self.sensorsFound = len(self.sensorDict.keys())
+        
+        print("------Sensor List-----")
         # Printing Num of Sensors and Sensor List
         print(f"Sensors Found: {self.sensorsFound}")
-        [print(sensor) for sensor in sensorList]
+        [print(sensor) for sensor in self.sensorDict.keys()]
 
     def selectAllSensors(self):
         """
@@ -162,15 +174,34 @@ class DelsysEMG:
         Setting sensor sensorNum to sampleMode.
         
         Inputs:
-            sensorNum (int): The number of the sensor.
+            sensorNum (int): The list of numbers for the sensors.
             sampleMode (str): The sample mode to be set.
 
         Sample Mode List can be found in the Delsys Manual folder under
         Delsys Sample Modes.
         """
+        print(sensorList)
+        print(sampleMode)
         # Setting sensor sensorNum to sampleMode. This works for lists.
         for sensorNum in range(len(sensorList)):
-            self.TrigBase.SetSampleMode(sensorList[sensorNum], sampleMode)
+            if sensorList[sensorNum] == 1:
+                try:
+                    sensorId = self.sensorNames[sensorNum]
+                    sensorPairOrder = self.sensorDict[sensorId] 
+                    self.TrigBase.SetSampleMode(sensorPairOrder, sampleMode)
+                except:
+                    print("Sensor Mode couldn't be set. SensorNum might be out of bounds of available sensors.")
+
+    def setAllSampleModes(self, sampleMode):
+        """
+        This function will set all sensors to the same sample mode.
+        
+        Inputs:
+            sampleMode (str): The sample mode to be set.
+        """
+        # Setting all sensors to sampleMode
+        for sensorNum in range(self.sensorsFound):
+            self.TrigBase.SetSampleMode(sensorNum, sampleMode)
 
     def configure(self, startTrigger = False, stopTrigger = False):
         """
