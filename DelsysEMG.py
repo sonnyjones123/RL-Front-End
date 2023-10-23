@@ -123,6 +123,10 @@ class DelsysEMG:
                     tempSensorName = sensorName.split(" ")[0]
                     self.sensorDict[int(tempSensorName)] = [num]
 
+                    # Asking user for input
+                    sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
+                    self.sensorDict[int(tempSensorName)].append(sensorMuscle)
+
             tempSensorKey = list(self.sensorDict.keys())
             print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
 
@@ -187,7 +191,7 @@ class DelsysEMG:
             if sensorList[sensorNum] == 1:
                 try:
                     sensorId = self.sensorNames[sensorNum]
-                    sensorPairOrder = self.sensorDict[sensorId] 
+                    sensorPairOrder = self.sensorDict[sensorId][0] 
                     self.TrigBase.SetSampleMode(sensorPairOrder, sampleMode)
                 except:
                     print("Sensor Mode couldn't be set. SensorNum might be out of bounds of available sensors.")
