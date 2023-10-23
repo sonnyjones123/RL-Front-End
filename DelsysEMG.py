@@ -140,7 +140,7 @@ class DelsysEMG:
         print("------Sensor List-----")
         # Printing Num of Sensors and Sensor List
         print(f"Sensors Found: {self.sensorsFound}")
-        [print(sensor) for sensor in self.sensorDict.keys()]
+        [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
 
     def selectAllSensors(self):
         """
