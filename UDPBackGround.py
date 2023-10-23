@@ -21,6 +21,7 @@ class DelsysUDPBackGround:
         self.UDP_IP = "127.0.0.1"
         self.UDP_RECEIVE_PORT = 5005
         self.UDP_SEND_PORT = 9005
+        self.UDP_EMG_SEND_PORT = 10005
         self.commandQueue = queue.Queue()
         self.listenUDPStart = 0
         
@@ -45,6 +46,14 @@ class DelsysUDPBackGround:
         sock = socket.socket(socket.AF_INET, # Internet
                             socket.SOCK_DGRAM) # UDP
         sock.sendto(MESSAGE, (self.UDP_IP, self.UDP_SEND_PORT))
+
+    def sendDelsysEMG(self, MESSAGE):
+        MESSAGE = bytes(MESSAGE, 'utf-8')
+
+        sock = socket.socket(socket.AF_INET, #Internet
+                             socket.SOCK_DGRAM) # UDP
+        
+        sock.sendto(MESSAGE, (self.UDP_IP, self.UDP_EMG_SEND_PORT))
     
     def listenUDP(self):
         self.listenUDPStart = threading.Thread(target = self.readUDP, args = (self.commandQueue,))
@@ -57,60 +66,33 @@ if __name__ == "__main__":
     # Set up UDP connection to LabView
     UDPBackground.listenUDP()
 
+    # Default status
     DelsysStatus = "off"
     UDPBackground.sendDelsysStatus(DelsysStatus)
     
+    # While port is alive
     while UDPBackground.listenUDPStart.is_alive():
         if not UDPBackground.commandQueue.empty():
-            print(DelsysEMG.status)
             command = UDPBackground.commandQueue.get()
             command = command.decode('utf-8')
-            
-            command = "DelsysEMG." + command
-            exec(command)
-            print(DelsysEMG.status)
-            UDPBackground.sendDelsysStatus(DelsysEMG.status)
 
+            if command == 'quit':
+                break
+            else:
+                command = "DelsysEMG." + command
+                exec(command)
+                UDPBackground.sendDelsysStatus(DelsysEMG.status)
+
+        # Sending Delsys Status
         if not DelsysEMG.status == DelsysStatus:
             DelsysStatus = DelsysEMG.status
             UDPBackground.sendDelsysStatus(DelsysStatus)
 
+        # Sending EMG Data
         if DelsysEMG.status == "Running":
             DelsysEMG.processData()
+            sendEMG = DelsysEMG.plotEMG()
+            UDPBackground.sendDelsysEMG(sendEMG)
 
         # Waiting Until Next Call
         time.sleep(0.033)
-
-
-"""
-listenUDP = threading.Thread(target = readUDP, args = (commandQueue,))
-listenUDP.start()
-# Setting up DelsysEMG Class
-#DelsysEMG = DelsysEMG()
-#DelsysStatus = "Off"
-#sendDelsysStatus(DelsysStatus, 9005)
-
-
-
-while listenUDP.is_alive():
-    if not commandQueue.empty():
-        print(DelsysEMG.status)
-        command = commandQueue.get()
-        command = command.decode('utf-8')
-        
-        command = "DelsysEMG." + command
-        exec(command)
-        print(DelsysEMG.status)
-        sendDelsysStatus(DelsysEMG.status, 9005)
-
-
-    if not DelsysEMG.status == DelsysStatus:
-        DelsysStatus = DelsysEMG.status
-        sendDelsysStatus(DelsysStatus, 9005)
-
-    if DelsysEMG.status == "Running":
-        DelsysEMG.processData()
-
-    # Waiting Until Next Call
-    time.sleep(0.033)
-"""

@@ -13,6 +13,8 @@ if (platform.node() == "Garangatan_Comp"):
     sys.path.insert(0, "C:/Users/grang/Box/NeuroRoboticsLab/NERVES Lab/Equipment Manuals/Delsys/Example-Applications-main/Python")
 elif (platform.node() == "Sonny_ThinkPad"):
     sys.path.insert(0, "C:/Users/sonny/Box/NeuroRoboticsLab/NERVES Lab/Equipment Manuals/Delsys/Example-Applications-main/Python")
+elif (platform.node() == 'Purkinje'):
+    sys.path.insert(0, "C:/Users/Purkinje/Box/NeuroRoboticsLab/NERVES Lab/Equipment Manuals/Delsys/Example-Applications-main/Python")
 
 from AeroPy.TrignoBase import *
 from AeroPy.DataManager import *
@@ -99,7 +101,7 @@ class DelsysEMG:
         command. This will put the system in pairing mode and will continue running
         until a sensor is paired. We can continue to pair additional sensors after.
         Sensors will quickly flash green when pairing is successful. Alternating 
-        green and yellow flashing indiccates waiting status.
+        green and yellow flashing indicates waiting status.
         """
     
         print("Starting Sensor Pairing...")
@@ -119,7 +121,7 @@ class DelsysEMG:
                     pass
                 else:
                     tempSensorName = sensorName.split(" ")[0]
-                    self.sensorDict[int(tempSensorName)] = num
+                    self.sensorDict[int(tempSensorName)] = [num]
 
             tempSensorKey = list(self.sensorDict.keys())
             print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
@@ -180,8 +182,6 @@ class DelsysEMG:
         Sample Mode List can be found in the Delsys Manual folder under
         Delsys Sample Modes.
         """
-        print(sensorList)
-        print(sampleMode)
         # Setting sensor sensorNum to sampleMode. This works for lists.
         for sensorNum in range(len(sensorList)):
             if sensorList[sensorNum] == 1:
@@ -248,8 +248,11 @@ class DelsysEMG:
     def startDataCollection(self):
         # Starting Data Collection
         if self.TrigBase.GetPipelineState() == "Armed":
-            self.TrigBase.Start()
-            print('Data Collection Started')
+            try:
+                self.TrigBase.Start()
+                print('Data Collection Started')
+            except:
+                pass
         else:
             print("Pipeline not in armed state.")
 
@@ -279,7 +282,7 @@ class DelsysEMG:
 
     def processData(self):
         """
-        The checkData functino outputs a System.Collections.Generic dictionary object. This function
+        The checkData function outputs a System.Collections.Generic dictionary object. This function
         will clean up the data from the checkData function and output it into a Python dictionary.
         """
         outArr = self.getData()
@@ -310,3 +313,41 @@ class DelsysEMG:
 
         # Updating Pipeline State
         self.status = self.TrigBase.GetPipelineState()
+
+    def resetPipeline(self):
+        """
+        Resets data pipeline to connected state. This is used when you want to update the current sensors
+        paired with the Delsys System.
+        """
+        # Resetting Pipeline State
+        self.TrigBase.ResetPipeline()
+        print('Resetting Pipeline State')
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
+
+    def plotEMG(self):
+        """
+        Plotting EMG data by taking the average value of data within self.data. Will reset the buffer after each iteration.
+        """
+        averageEMG = []
+
+        # Looping through self.data
+        try:
+            if (len(self.data) != 0):
+                for i in range(len(self.channelNames)):
+                    if "EMG" in self.channelNames[i]:
+                        avg_data = np.average(self.data[0][i])
+                        averageEMG.append(avg_data)
+            else:
+                averageEMG.append(np.zeros(self.sensorsFound))
+
+        except Exception as e:
+            print(e)
+            averageEMG.append(np.zeros(self.sensorsFound))
+
+        # Resetting Buffer
+        self.data = []
+
+        # Returning string formatted EMG data
+        return ','.join(map(str, averageEMG))
