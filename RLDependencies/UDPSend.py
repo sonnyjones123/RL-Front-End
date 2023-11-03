@@ -1,13 +1,21 @@
-import socket
+import websocket
+import json
 
-UDP_IP = "127.0.0.1"
-UDP_PORT = 10005
-MESSAGE = b'0.046894427478308534,0.11051005054341723,0.06613200852638242,0.059442356868074524'
+# OBS WebSocket server URL (replace with your server address)
+websocket_url = "ws://10.46.6.53:10005"  # Replace with your server address
 
-# print("UDP target IP: %s" % UDP_IP)
-# print("UDP target port: %s" % UDP_PORT)
-# print("message: %s" % MESSAGE)
- 
-sock = socket.socket(socket.AF_INET, # Internet
-                     socket.SOCK_DGRAM) # UDP
-sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
+# Function to send a command to OBS Studio
+def send_command(command, websocket_url=websocket_url):
+    try:
+        ws = websocket.WebSocket()
+        ws.connect(websocket_url)
+        message = json.dump({"request-type":command})
+        ws.send(message)
+        ws.close()
+        print(f"Sent command: {command}")
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Example commands:
+send_command("StartRecording")
+# send_command("StopRecording")
