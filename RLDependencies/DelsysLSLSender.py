@@ -35,10 +35,13 @@ class DelsysLSLSender:
         elapsedTime = local_clock() - self.startTime
         requiredSamples = int(self.sampRate * elapsedTime) - self.sentSamples
         # Send a chunk of data, will need to update time_stamp if we care
-        self.outlet.push_chunk(data, elapsedTime)
+        try:
+            self.outlet.push_chunk(data, elapsedTime)
         # self.outlet.push_chunk(data)
-        self.sentSamples += requiredSamples
+            self.sentSamples += requiredSamples
         #time.sleep(0.01)
+        except:
+            pass
 
 
 """

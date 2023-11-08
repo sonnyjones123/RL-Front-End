@@ -2,8 +2,11 @@ import sys
 import platform
 import numpy as np
 import clr
+import tkinter as tk
+
 clr.AddReference("System.Collections")
 
+from tkinter import simpledialog
 from System.Collections.Generic import *
 
 # Adding path for current computer
@@ -17,8 +20,8 @@ elif (platform.node() == 'Purkinje'):
 
 from AeroPy.TrignoBase import *
 from AeroPy.DataManager import *
-from DelsysLSLSender import *
-from DelsysLSLReceiver import *
+from RLDependencies.DelsysLSLSender import *
+from RLDependencies.DelsysLSLReceiver import *
 
 class DelsysEMG:
     """
@@ -51,6 +54,10 @@ class DelsysEMG:
         self.numSensors = 16
         self.numSensorsConnected = 0
         self.status = "Off"
+
+        # Text Input Box
+        self.ROOT = tk.Tk()
+        self.ROOT.withdraw()
 
         # LSL objects to be filled in when configure is pressed.
         self.LSLSender = 0
@@ -93,9 +100,6 @@ class DelsysEMG:
         # Checking the status of the Delsys EMG system
         self.status = self.TrigBase.GetPipelineState()
 
-        # Printing Current Status
-        print(f"Current Status: {self.status}")
-
     def currentStatus(self):
         """
         Checks current status of Delsys EMG system.
@@ -133,7 +137,9 @@ class DelsysEMG:
                     self.sensorDict[int(tempSensorName)] = [num]
 
                     # Asking user for input
-                    sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
+                    # sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
+                    sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
+                                                          prompt = 'Please indicate which muscle this sensor is on.')
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
             tempSensorKey = list(self.sensorDict.keys())
@@ -151,12 +157,18 @@ class DelsysEMG:
         print(f"Sensors Found: {self.sensorsFound}")
         [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
 
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
+
     def selectAllSensors(self):
         """
         Selects all sensors conencted to the Delsys EMG System for streaming.
         """
         # Selecting all sensors.
         self.TrigBase.SelectAllSensors()
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
 
     def selectSensor(self, sensorNum):
         """
@@ -165,6 +177,9 @@ class DelsysEMG:
         """
         # Selecting individual sensor at index sensor_num.
         self.TrigBase.SelectSensor(sensorNum)
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
 
     def availableSensorModes(self, sensorNum):
         """
@@ -177,12 +192,18 @@ class DelsysEMG:
         for i, mode in enumerate(self.modeList):
             print(f"Mode {i} : {mode}")
 
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
+
     def getCurrentSensorMode(self, sensorNum):
         """
         Will get current sensor mode from sensor sensorNum.
         """
         # Getting current sensor mode.
         print(self.TrigBase.GetCurrentSensorMode(sensorNum))
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
 
     def setSampleMode(self, sensorList, sampleMode):
         """
@@ -195,11 +216,18 @@ class DelsysEMG:
         Sample Mode List can be found in the Delsys Manual folder under
         Delsys Sample Modes.
         """
-        for sensorNum in range(len(sensorList)):
+        for sensorNum in sensorList:
             try:
-                self.TrigBase.SetSampleMode(sensorList[sensorNum], sampleMode)
+                sensorID = self.sensorNames[sensorNum]
+                sensorPairOrder = self.sensorDict[sensorID][0]
+                self.TrigBase.SetSampleMode(sensorPairOrder, sampleMode)
             except:
                 print("Sensor Mode couldn't be set. SensorNum might be out of bounds of available sensors.")
+
+        print(f"Sample mode of {sensorList} set tp {sampleMode}" )
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
 
     def setSampleModeLabView(self, sensorList, sampleMode):
         """
@@ -217,12 +245,17 @@ class DelsysEMG:
             if sensorList[sensorNum] == 1:
                 
                 try:
-                    sensorId = self.sensorNames[sensorNum]
-                    sensorPairOrder = self.sensorDict[sensorId][0] 
+                    sensorID = self.sensorNames[sensorNum]
+                    sensorPairOrder = self.sensorDict[sensorID][0] 
                     self.TrigBase.SetSampleMode(sensorPairOrder, sampleMode)
                     # Increase the number of sensors connected for LSL
                 except:
                     print("Sensor Mode couldn't be set. SensorNum might be out of bounds of available sensors.")
+
+        print(f"Sample mode of {sensorList} set tp {sampleMode}" )
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
 
     def setAllSampleModes(self, sampleMode):
         """
@@ -236,6 +269,9 @@ class DelsysEMG:
             self.TrigBase.SetSampleMode(sensorNum, sampleMode)
             # Increase the number of sensors connected for LSL
             self.numSensorsConnected += 1
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()
 
     def configure(self, startTrigger = False, stopTrigger = False):
         """
@@ -263,6 +299,7 @@ class DelsysEMG:
             self.channelCount = 0
             self.channelNames = []
             self.sampleRates = []
+            self.numEMGChannels = 0
             self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
 
             # Looping through sensor list
@@ -278,7 +315,11 @@ class DelsysEMG:
                         self.channelNames.append(selectedSensor.TrignoChannels[channel].Name)
                         self.sampleRates.append(selectedSensor.TrignoChannels[channel].SampleRate)
                         self.samplesPerFrame.append(selectedSensor.TrignoChannels[channel].SamplesPerFrame)
-            
+
+                        # Updating numEMGChannels
+                        if 'EMG' in selectedSensor.TrignoChannels[channel].Name:
+                            self.numEMGChannels += 1           
+
             # Create LSLSender object, assuming sample rates are the same for all EMG sensors
             self.LSLSender = DelsysLSLSender("Delsys", "EMG", self.numSensorsConnected, self.sampleRates[0])
             self.LSLSender.createOutlet(self.channelNames, self.sampleRates)
@@ -317,7 +358,6 @@ class DelsysEMG:
         else:
             return None
             
-
     def processData(self):
         """
         The checkData function outputs a System.Collections.Generic dictionary object. This function
@@ -353,12 +393,11 @@ class DelsysEMG:
                             dataColumnIterator += 1
 
                 # Sending data over LSL
-                print(self.numSensorsConnected)
-                print(dataToSend)
                 self.LSLSender.sendLSLData(dataToSend)
                 
-            except IndexError:
-                pass
+            except IndexError as e:
+                print(399)
+                print(e)
 
     def stopDataCollection(self):
         """
@@ -408,6 +447,32 @@ class DelsysEMG:
 
         # Returning string formatted EMG data
         return ','.join(map(str, averageEMG))
+    
+    def plotEMGGUI(self):
+        """
+        Plotting EMG data by taking the average value of data within self.data. Will reset the buffer after each iteration.
+        """
+        averageEMG = []
+
+        # Looping through self.data
+        try:
+            if (len(self.data) != 0):
+                for i in range(len(self.channelNames)):
+                    if "EMG" in self.channelNames[i]:
+                        avg_data = np.average(self.data[0][i])
+                        averageEMG.append(avg_data)
+            else:
+                averageEMG = np.zeros(self.sensorsFound)
+
+        except Exception as e:
+            print(e)
+            averageEMG = np.zeros(self.sensorsFound)
+
+        # Resetting Buffer
+        self.data = []
+
+        # Returning string formatted EMG data
+        return averageEMG
     
     def savingEMGData(self, fileName):
         dataToSave = np.array([])

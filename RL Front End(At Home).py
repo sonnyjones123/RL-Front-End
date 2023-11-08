@@ -3,8 +3,10 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from functools import partial
+import threading
 
-from RLDependencies.DelsysEMG import *
+from RLDependencies.EMGPlot import *
+# from RLDependencies.DelsysEMG import *
 
 class MyWidget(QWidget):
     def __init__(self):
@@ -13,10 +15,11 @@ class MyWidget(QWidget):
         # Recording Perams
         self.recording = 0
 
-        self.DelsysEMG = DelsysEMG()
+        # self.DelsysEMG = DelsysEMG()
         self.DelsysButtonPanel = self.delsysButtonPanel()
         self.splitter = QSplitter(self)
         self.splitter.addWidget(self.DelsysButtonPanel)
+        self.EMGPlot = None
         layout = QHBoxLayout()
         self.setStyleSheet("background-color:#f5e1fd;")
         layout.addWidget(self.splitter)
@@ -37,6 +40,7 @@ class MyWidget(QWidget):
 
         # Delsys Status
         self.delsysStatus = QLabel("<b>Delsys Status: </b>", alignment = Qt.AlignCenter) # = self.DelsysEMG.status)
+        self.delsysStatus.setStyleSheet('QLabel {color: black;}')
         delsysButtonLayout.addWidget(self.delsysStatus)
 
         # Connect Button
@@ -96,6 +100,7 @@ class MyWidget(QWidget):
         for i in range(0,4):
             for j in range(0,4):
                 btn = QPushButton(str(tempSensor))
+                btn.setStyleSheet('QPushButton {color: black}')
                 btn.pressed.connect(partial(self.button_grid_press, str(tempSensor - 1)))
                 sensorGrid.addWidget(btn,i,j)
                 tempSensor += 1
@@ -105,6 +110,7 @@ class MyWidget(QWidget):
 
         # Displaying Selected Sensors
         self.sensorSelectedDisplay = QLabel("Sensors Selected: " + str(self.sensorsSelected))
+        self.sensorSelectedDisplay.setStyleSheet('QLabel {color: black;}')
         delsysButtonLayout.addWidget(self.sensorSelectedDisplay)
 
         # Creating next layout
@@ -188,7 +194,7 @@ class MyWidget(QWidget):
 
         # Data Collection Label
         self.dataCollectionLabel = QLabel("<b>Data Collection</b>", alignment = Qt.AlignCenter)
-        self.dataCollectionLabel.setStyleSheet('QLabel {font-size: 16px}')
+        self.dataCollectionLabel.setStyleSheet('QLabel {color: black; font-size: 16px;}')
         delsysButtonLayout.addWidget(self.dataCollectionLabel)
 
         # Data Collection Layout
@@ -203,7 +209,7 @@ class MyWidget(QWidget):
         self.startDataCollectionButton.setEnabled(False)
         dataCollectionButtonLayout.addWidget(self.startDataCollectionButton)
 
-        # Create Start Data Collection Button
+        # Stop Data Collection Button
         self.stopDataCollectionButton = QPushButton("Stop", self)
         self.stopDataCollectionButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.stopDataCollectionButton.objectName = 'Start Collection'
@@ -221,9 +227,18 @@ class MyWidget(QWidget):
         return delsysButtonPanel
     
     def delsysLivePlot(self):
-        if self.recording == 1:
-            pass
+        self.recording = 1
+        # self.plottingThread = threading.Thread(target= self.dataProcessing, args = ())
+        # self.plottingThread.start()
 
+    def dataProessing(self):
+        # Data Processing Pipeline
+        # self.DelsysEMG.processData()
+        # averageEMG = self.DelsysEMG.plotEMGGUI()
+        # self.EMGPlot.plotEMG(averageEMG)
+        time.sleep(0.001)
+
+# Need to add in a way to remove buttons from the grid
     def button_grid_press(self, value):
         try:
             self.sensorsSelected.index(int(value))
@@ -239,7 +254,7 @@ class MyWidget(QWidget):
     def connectCallback(self):
         self.connectButton.setEnabled(False)
         self.connectButton.setStyleSheet("color: grey")
-        self.DelsysEMG.connect()
+        # self.DelsysEMG.connect()
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
         self.pairSensorButton.setEnabled(True)
@@ -261,7 +276,7 @@ class MyWidget(QWidget):
 
     # Delsys Scan Sensor Callback
     def scanSensorCallback(self):
-        self.DelsysEMG.connectSensors(0)
+        # self.DelsysEMG.connectSensors(0)
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
         self.selectSensorButton.setEnabled(True)
@@ -273,8 +288,8 @@ class MyWidget(QWidget):
 
     # Delsys Select Sensor Callback
     def selectSensorCallback(self):
-        for sensor in self.sensorsSelected:
-            self.DelsysEMG.selectSensor(sensor)
+        # for sensor in self.sensorsSelected:
+            # self.DelsysEMG.selectSensor(sensor)
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
         self.setSampleMode.setEnabled(True)
@@ -284,7 +299,7 @@ class MyWidget(QWidget):
 
     # Delsys Select All Sensor Callback
     def selectAllSensorCallback(self):
-        self.DelsysEMG.selectAllSensors()
+        # self.DelsysEMG.selectAllSensors()
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
         self.setSampleMode.setEnabled(True)
@@ -295,46 +310,50 @@ class MyWidget(QWidget):
     # Reset Sensor Selection Callback
     def resetSensorSelectionCallback(self):
         self.sensorsSelected.clear()
+        self.sensorSelectedDisplay.setText("Sensors Selected: " + str(self.sensorsSelected))
 
     # Set Sample Mode Callback
     def setSampleModeCallback(self):
-        self.DelsysEMG.setSampleMode(self.sensorsSelected, self.sensorModeDropdown.text())
+        # self.DelsysEMG.setSampleMode(self.sensorsSelected, self.sensorModeDropdown.text())
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
         self.configureButton.setEnabled(True)
         self.configureButton.setStyleSheet('QPushButton {color: black;}')
-        pass
 
     # Set All Sample Mode Callback
     def setAllSampleModeCallback(self):
-        self.DelsysEMG.setAllSampleModes(self.sensorModeDropdown.text())
+        # self.DelsysEMG.setAllSampleModes(self.sensorModeDropdown.text())
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
         self.configureButton.setEnabled(True)
         self.configureButton.setStyleSheet('QPushButton {color: black;}')
-        pass
 
     # Configure Callback
     def configureCallback(self):
-        self.DelsysEMG.configure()
+        # self.DelsysEMG.configure()
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
-        pass
+
+        # Adding Sensor Plots
+        if self.EMGPlot is None:
+            self.EMGPlot = EMGPlot(3) # = EMGPlot(self.DelsysEMG.numEMGChannels)
+            self.splitter.addWidget(self.EMGPlot.plotWidget)
+            widget.resize(1000, 400)
 
     # Start Data Collection Callback
     def startDataCollectionCallback(self):
-        self.DelsysEMG.startDataCollection()
+        # self.DelsysEMG.startDataCollection()
 
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
-        pass
+        self.delsysLivePlot()
 
     # Stop Data Collection Callback
     def stopDataCollectionCallback(self):
-        self.DelsysEMG.stopDataCollection()
+        # self.DelsysEMG.stopDataCollection()
 
+        self.recording = 0
         self.delsysStatus.setText("<b>Delsys Status: </b>") # + self.DelsysEMG.status)
-        pass
-    
+        # self.plottingThread.kill()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
