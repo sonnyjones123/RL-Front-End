@@ -8,9 +8,10 @@ import threading
 from RLDependencies.EMGPlot import *
 from RLDependencies.DelsysEMG import *
 
-class MyWidget(QWidget):
+class MyWidget(QWidget, QThread):
     def __init__(self):
         QWidget.__init__(self)
+        QThread.__init__(self)
 
         # Recording Perams
         self.recording = 0
@@ -236,7 +237,7 @@ class MyWidget(QWidget):
         # Data Processing Pipeline
         self.recording = True
         while self.recording is True:
-            time.sleep(0.033)
+            time.sleep(0.05)
             try:
                 self.DelsysEMG.processData()
                 averageEMG = self.DelsysEMG.plotEMGGUI()
