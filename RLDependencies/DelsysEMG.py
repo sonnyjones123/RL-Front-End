@@ -299,6 +299,7 @@ class DelsysEMG:
             self.channelCount = 0
             self.channelNames = []
             self.sampleRates = []
+            self.EMGSensors = []
             self.numEMGChannels = 0
             self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
 
@@ -318,7 +319,8 @@ class DelsysEMG:
 
                         # Updating numEMGChannels
                         if 'EMG' in selectedSensor.TrignoChannels[channel].Name:
-                            self.numEMGChannels += 1           
+                            self.numEMGChannels += 1    
+                            self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])        
 
             # Create LSLSender object, assuming sample rates are the same for all EMG sensors
             self.LSLSender = DelsysLSLSender("Delsys", "EMG", self.numSensorsConnected, self.sampleRates[0])

@@ -8,14 +8,15 @@ import threading
 from RLDependencies.EMGPlot import *
 from RLDependencies.DelsysEMG import *
 
-class MyWidget(QWidget, QThread):
+class MyWidget(QMainWindow):
     def __init__(self):
-        QWidget.__init__(self)
-        QThread.__init__(self)
+        QMainWindow.__init__(self)
 
-        # Recording Perams
+        # Recording Params
         self.recording = 0
-    
+
+        self.centralWidget = QWidget()
+        self.setCentralWidget(self.centralWidget)
         self.DelsysEMG = DelsysEMG() 
         self.DelsysButtonPanel = self.delsysButtonPanel()
         self.splitter = QSplitter(self)
@@ -24,8 +25,14 @@ class MyWidget(QWidget, QThread):
         layout = QHBoxLayout()
         self.setStyleSheet("background-color:#f5e1fd;")
         layout.addWidget(self.splitter)
-        self.setLayout(layout)
+        # self.setLayout(layout)
         self.setWindowTitle("Data Collection GUI")
+        self.centralWidget.setLayout(layout)
+
+        # QTimer
+        self.timer = QTimer()
+        self.timer.setInterval(1)
+        self.timer.timeout.connect(self.dataProcessing)
 
     #-----------------------------------------------------------------------------------
     # ---- Delsys Control Widget
@@ -227,29 +234,28 @@ class MyWidget(QWidget, QThread):
 
         return delsysButtonPanel
     
-    
-    def delsysLivePlot(self):
-        self.recording = True
-        self.plottingThread = threading.Thread(target = self.dataProcessing, daemon=True)
-        self.plottingThread.start()
-    
     def dataProcessing(self):
         # Data Processing Pipeline
         self.recording = True
-        while self.recording is True:
-            time.sleep(0.05)
-            try:
-                self.DelsysEMG.processData()
-                averageEMG = self.DelsysEMG.plotEMGGUI()
-                self.EMGPlot.plotEMG(averageEMG)
-            except:
-                pass
+        # while self.recording is True:
+        # time.sleep(0.001)
+        try:
+            self.DelsysEMG.processData()
+            averageEMG = self.DelsysEMG.plotEMGGUI()
+            self.EMGPlot.plotEMG(averageEMG)
+        except:
+            pass
     
 
 # Need to add in a way to remove buttons from the grid
     def button_grid_press(self, value):
         try:
-            self.sensorsSelected.index(int(value))
+            if (self.sensorsSelected.count(int(value)) > 0):
+                valInd = self.sensorsSelected.index(int(value))
+                self.sensorsSelected.pop(valInd)
+            else:
+                valInd = self.sensorsSelected.index(int(value))
+
         except:
             self.sensorsSelected.append(int(value))
 
@@ -346,7 +352,7 @@ class MyWidget(QWidget, QThread):
 
         # Adding Sensor Plots
         if self.EMGPlot is None:
-            self.EMGPlot = EMGPlot(self.DelsysEMG.numEMGChannels)
+            self.EMGPlot = EMGPlot(self.DelsysEMG.numEMGChannels, self.DelsysEMG.sensorDict, self.DelsysEMG.EMGSensors)
             self.splitter.addWidget(self.EMGPlot.plotWidget)
             widget.resize(1000, 400)
 
@@ -357,7 +363,7 @@ class MyWidget(QWidget, QThread):
         self.stopDataCollectionButton.setEnabled(True)
         self.stopDataCollectionButton.setStyleSheet("QPushButton {color: black;}")
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
-        self.delsysLivePlot()
+        self.timer.start()
 
     # Stop Data Collection Callback
     def stopDataCollectionCallback(self):
@@ -365,7 +371,7 @@ class MyWidget(QWidget, QThread):
 
         self.recording = False
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
-        self.plottingThread.join()
+        self.timer.stop()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -7,14 +7,17 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 
 class EMGPlot(QWidget):
-    def __init__(self, numGraphs=1):
+    def __init__(self, numGraphs=1, sensorDict=None, EMGSensors=None):
         super().__init__()
         self.numGraphs = numGraphs
+        self.sensorDict = sensorDict
+        self.EMGSensors = EMGSensors
         self.bufferSize = 5000
         self.samples = np.arange(-(self.bufferSize - 1), 1)
         self.sampleCount = 0
         self.plottingBuffer = np.zeros((self.numGraphs, self.bufferSize))
         self.plottingPanel = self.PlottingPanel()
+        self.updateTimer = 100
         
     def PlottingPanel(self):
         plottingPanel = QWidget()
@@ -23,8 +26,13 @@ class EMGPlot(QWidget):
 
         # Creating Plotting Panel with numGraphs
         for numGraph in range(self.numGraphs):
-            exec(f"self.plot{numGraph} = self.plotWidget.addPlot(row = {numGraph}, col = 0)")
+            sensorMuscle = self.sensorDict[self.EMGSensors[numGraph]][1]
+
+            exec(f"self.plot{numGraph} = self.plotWidget.addPlot(title = sensorMuscle, row = {numGraph}, col = 0)")
+            exec(f"self.plot{numGraph}.setTitle(sensorMuscle)")
             exec(f"self.plotItem{numGraph} = self.plot{numGraph}.plot(self.samples, self.plottingBuffer[numGraph])")
+            
+
 
         return plottingPanel
     
@@ -37,8 +45,12 @@ class EMGPlot(QWidget):
         self.sampleCount += 1
         self.samples = np.roll(self.samples, -1)
         self.samples[-1] = self.sampleCount
-        for numGraph in range(self.numGraphs):
-            exec(f"self.plotItem{numGraph}.setData(self.samples, self.plottingBuffer[numGraph])")
+        if self.updateTimer == 100:
+            for numGraph in range(self.numGraphs):
+                exec(f"self.plotItem{numGraph}.setData(self.samples, self.plottingBuffer[numGraph])")
+            self.updateTimer = 0
+        else:
+            self.updateTimer += 1
 
         self.plottingBuffer = np.roll(self.plottingBuffer, -1, axis = 1)
         
