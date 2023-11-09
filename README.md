@@ -7,8 +7,8 @@ University of Utah
 ---
 
 Written by Sonny Jones & Grange Simpson
-Last Updated: 10/4/2023
+Last Updated: 11/9/2023
 
 ---
 
-This dictionary contains a Delsys Python class and GUI that function as a handshake between the computer and Delsys Trigno EMG System. 
+This repository contains a PyQt Gui built out for dynamic control and plotting for the DelsysEMG system. This includes classes built out for Python control of the Delsy EMG Trigno Base, EMG plotting, Lab Stream Layer Sender and Receiver, and Camera Control Software using OpenCV and PyAudio.
