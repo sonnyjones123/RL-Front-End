@@ -6,6 +6,7 @@ from functools import partial
 import threading
 
 from RLDependencies.EMGPlot import *
+from RLDependencies.OpenCVWidget import *
 # from RLDependencies.DelsysEMG import *
 
 class MyWidget(QWidget):
@@ -20,6 +21,8 @@ class MyWidget(QWidget):
         self.splitter = QSplitter(self)
         self.splitter.addWidget(self.DelsysButtonPanel)
         self.EMGPlot = None
+        self.videoCapture = VideoWidget()
+        self.splitter.addWidget(self.videoCapture)
         layout = QHBoxLayout()
         self.setStyleSheet("background-color:#f5e1fd;")
         layout.addWidget(self.splitter)
@@ -337,8 +340,8 @@ class MyWidget(QWidget):
         # Adding Sensor Plots
         if self.EMGPlot is None:
             self.EMGPlot = EMGPlot(3) # = EMGPlot(self.DelsysEMG.numEMGChannels)
-            self.splitter.addWidget(self.EMGPlot.plotWidget)
-            widget.resize(1000, 400)
+            self.splitter.insertWidget(1, self.EMGPlot.plotWidget)
+            widget.resize(1700, 400)
 
     # Start Data Collection Callback
     def startDataCollectionCallback(self):

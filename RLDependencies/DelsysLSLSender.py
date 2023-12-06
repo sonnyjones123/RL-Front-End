@@ -44,7 +44,7 @@ class DelsysLSLSender:
             pass
 
 
-"""
+
 def main():
     info = StreamInfo("Delsys", "EMG", 2, 100, 'float32')
 
@@ -63,4 +63,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-"""

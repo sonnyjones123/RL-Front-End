@@ -3,6 +3,8 @@ import platform
 import numpy as np
 import clr
 import tkinter as tk
+import threading
+
 
 clr.AddReference("System.Collections")
 
@@ -37,11 +39,12 @@ class DelsysEMG:
     etc.  
 
     Author: Sonny Jones & Grange Simpson
+    Version: 2023.11.10
 
     Usage:
 
-    1. Create an instance of this class.
         DelsysEMG = DelsysEMG()
+
     """
     def __init__(self):
         # Key and License are obtained from Delsys. You may want to reach out to them for 
@@ -128,6 +131,8 @@ class DelsysEMG:
             while self.TrigBase.CheckPairStatus():
                 continue
             
+# Need to check why adding 1 sensors on accident multiple times causes errors 
+
             # Adding sensorNames and sensorNum to dict
             for sensorName in self.TrigBase.GetSensorNames():
                 tempSensorName = sensorName.split(" ")[0]
@@ -139,7 +144,7 @@ class DelsysEMG:
                     # Asking user for input
                     # sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
                     sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                                                          prompt = 'Please indicate which muscle this sensor is on.')
+                                                          prompt = 'Please indicate which muscle this sensor is on.', parent=self.ROOT)
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
             tempSensorKey = list(self.sensorDict.keys())
@@ -210,7 +215,7 @@ class DelsysEMG:
         Setting sensor sensorNum to sampleMode.
         
         Inputs:
-            sensorNum (int): The list of numbers for the sensors.
+            sensorList (int): The list of numbers for the sensors.
             sampleMode (str): The sample mode to be set.
 
         Sample Mode List can be found in the Delsys Manual folder under
@@ -234,7 +239,7 @@ class DelsysEMG:
         Setting sensor sensorNum to sampleMode.
         
         Inputs:
-            sensorNum (int): The list of numbers for the sensors.
+            sensorList (int): The list of numbers for the sensors.
             sampleMode (str): The sample mode to be set.
 
         Sample Mode List can be found in the Delsys Manual folder under
@@ -323,8 +328,9 @@ class DelsysEMG:
                             self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])        
 
             # Create LSLSender object, assuming sample rates are the same for all EMG sensors
-            self.LSLSender = DelsysLSLSender("Delsys", "EMG", self.numSensorsConnected, self.sampleRates[0])
-            self.LSLSender.createOutlet(self.channelNames, self.sampleRates)
+            # self.LSLSender = DelsysLSLSender("Delsys", "EMG", self.numSensorsConnected, self.sampleRates[0])
+            # self.LSLSender.createOutlet(self.channelNames, self.sampleRates)
+            # self.LSLReceiver = DelsysLSLReceiver("EMG")
 
     def startDataCollection(self):
         # Starting Data Collection
@@ -332,7 +338,9 @@ class DelsysEMG:
             try:
                 self.TrigBase.Start()
                 print('Data Collection Started')
-            except:
+            except Exception as e:
+                print(342)
+                print(e)
                 pass
         else:
             print("Pipeline not in armed state.")
@@ -395,10 +403,11 @@ class DelsysEMG:
                             dataColumnIterator += 1
 
                 # Sending data over LSL
-                self.LSLSender.sendLSLData(dataToSend)
+                # self.LSLSender.sendLSLData(dataToSend)
+                
+                # print(received_data)
                 
             except IndexError as e:
-                print(399)
                 print(e)
 
     def stopDataCollection(self):
@@ -441,6 +450,7 @@ class DelsysEMG:
                 averageEMG.append(np.zeros(self.sensorsFound))
 
         except Exception as e:
+            print(453)
             print(e)
             averageEMG.append(np.zeros(self.sensorsFound))
 
@@ -467,8 +477,10 @@ class DelsysEMG:
                 averageEMG = np.zeros(self.sensorsFound)
 
         except Exception as e:
+            print(480)
             print(e)
             averageEMG = np.zeros(self.sensorsFound)
+
 
         # Resetting Buffer
         self.data = []
@@ -476,19 +488,5 @@ class DelsysEMG:
         # Returning string formatted EMG data
         return averageEMG
     
-    def savingEMGData(self, fileName):
-        dataToSave = np.array([])
-        dataColumnIterator = 0
-        # Take self.data and save to a file
-        if len(self.data) != 0:
-            for i in range(len(self.channelNames)):
-                if "EMG" in self.channelNames[i]:
-                    if dataColumnIterator == 0:
-                        dataToSave = self.data[0][i]
-                    else:
-                        dataToSave = np.dstack((dataToSave, self.data[0][i]))
-                    dataColumnIterator += 1
-            #print(fileName)
-            with open(fileName, 'wb') as f:
-                #print("Writing Data")
-                np.save(f, dataToSave)
+    def returnAllData(self):
+        return self.DataHandler.allcollectiondata

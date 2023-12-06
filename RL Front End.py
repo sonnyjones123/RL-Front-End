@@ -1,38 +1,135 @@
+"""
+This is the main Reinforcement Learning GUI that incorperates the DelsyEMG control class, EMGPlot class, Computer Vision class, 
+and XSensor Control Class. This GUI is used to control each data acqusition device and create a pipeline for saving data in real time.
+
+Written by Sonny Jones & Grange Simpson
+Version: 2023.11.10
+
+Usage: Run the file.
+
+"""
+
 import sys
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from functools import partial
 import threading
+import csv
+from datetime import date
 
 from RLDependencies.EMGPlot import *
 from RLDependencies.DelsysEMG import *
+from RLDependencies.OpenCVWidget import *
+from RLDependencies.XSensorWidget import *
+
+class DataCollector(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.data = []
+        self.running = True
+
+    def stop(self):
+        self.running = False
+
+    def save_to_csv(self, data, filename):
+        with open(filename, 'a', newline='\n') as csvfile:
+            writer = csv.writer(csvfile)
+            #writer.writerow(['Collected Data'])
+            for value in data:
+                writer.writerow([value])
 
 class MyWidget(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
 
         # Recording Params
-        self.recording = 0
+        self.recording = False
 
+        # Creating Widgets from Subclasses
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
+        self.DataControlPanel = self.dataControlPanel()
+        layout = QHBoxLayout()
+        collectionLayout = QVBoxLayout()
+        layout.addWidget(self.DataControlPanel)
         self.DelsysEMG = DelsysEMG() 
         self.DelsysButtonPanel = self.delsysButtonPanel()
         self.splitter = QSplitter(self)
         self.splitter.addWidget(self.DelsysButtonPanel)
         self.EMGPlot = None
-        layout = QHBoxLayout()
+        self.videoCapture = VideoWidget()
+        self.splitter.addWidget(self.videoCapture)
         self.setStyleSheet("background-color:#f5e1fd;")
-        layout.addWidget(self.splitter)
-        # self.setLayout(layout)
+        collectionLayout.addWidget(self.splitter)
+        self.xSensorWidget = XSensorWidget()
+        collectionLayout.addWidget(self.xSensorWidget)
+        collectionWidget = QWidget()
+        collectionWidget.setLayout(collectionLayout)
+        layout.addWidget(collectionWidget)
         self.setWindowTitle("Data Collection GUI")
         self.centralWidget.setLayout(layout)
 
         # QTimer
         self.timer = QTimer()
-        self.timer.setInterval(1)
         self.timer.timeout.connect(self.dataProcessing)
+        self.timer.start(1)
+        self.videoTimer = self.videoCapture.frameDelay
+        self.xSensorTimer = self.xSensorWidget.frameDelay
+
+        # QElapsedTimer
+        self.dataCollectionTimer = QElapsedTimer()
+
+    
+    #-----------------------------------------------------------------------------------
+    # ---- Data Saving Panel
+    def dataControlPanel(self):
+        dataControlPanel = QWidget()
+        dataControlLayout = QVBoxLayout()
+        dataControlPanel.setFixedSize(400, 150)
+
+        # Data Collection Label
+        self.dataCollectionLabel = QLabel("<b>Data Collection</b>", alignment = Qt.AlignCenter)
+        self.dataCollectionLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
+        dataControlLayout.addWidget(self.dataCollectionLabel)
+
+        # Data Collection Layout
+        dataCollectionButtonLayout = QHBoxLayout()
+
+        # Data Collection Button
+        self.startDataCollectionButton = QPushButton("Start", self)
+        self.startDataCollectionButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.startDataCollectionButton.objectName = 'Start Collection'
+        self.startDataCollectionButton.clicked.connect(self.startDataCollectionCallback)
+        self.startDataCollectionButton.setStyleSheet('color: grey;')
+        self.startDataCollectionButton.setEnabled(False)
+        dataCollectionButtonLayout.addWidget(self.startDataCollectionButton)
+
+        # Stop Data Collection Button
+        self.stopDataCollectionButton = QPushButton("Stop", self)
+        self.stopDataCollectionButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.stopDataCollectionButton.objectName = 'Start Collection'
+        self.stopDataCollectionButton.clicked.connect(self.stopDataCollectionCallback)
+        self.stopDataCollectionButton.setStyleSheet('color: grey;')
+        self.stopDataCollectionButton.setEnabled(False)
+        dataCollectionButtonLayout.addWidget(self.stopDataCollectionButton)
+
+        # Save Collected Data Button
+        self.saveCollectedDataButton = QPushButton("Save Trial Data", self)
+        self.saveCollectedDataButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.saveCollectedDataButton.objectName = 'Save Collection'
+        self.saveCollectedDataButton.clicked.connect(self.saveDataCollectionCallback)
+        self.saveCollectedDataButton.setStyleSheet('color: grey;')
+        self.saveCollectedDataButton.setEnabled(False)
+        dataCollectionButtonLayout.addWidget(self.saveCollectedDataButton)
+
+        # Adding Collection Panel to Main
+        dataControlLayout.addLayout(dataCollectionButtonLayout)
+
+        # Setting Layout
+        dataControlPanel.setLayout(dataControlLayout)
+
+        return dataControlPanel
 
     #-----------------------------------------------------------------------------------
     # ---- Delsys Control Widget
@@ -40,6 +137,7 @@ class MyWidget(QMainWindow):
     def delsysButtonPanel(self):
         delsysButtonPanel = QWidget()
         delsysButtonLayout = QVBoxLayout()
+        delsysButtonPanel.setFixedSize(400, 500)
         
         # Title
         self.textDelsys = QLabel("<b>Delsy Trigno System</b>", alignment = Qt.AlignCenter)
@@ -94,7 +192,7 @@ class MyWidget(QMainWindow):
         delsysButtonLayout.addLayout(findSensorLayout)
 
         # Adding label
-        self.sensorGridLabel = QLabel("<b>Sensor Selection Grid</b>",self, alignment = Qt.AlignCenter)
+        self.sensorGridLabel = QLabel("<b>Sensor Selection Grid</b>", self, alignment = Qt.AlignCenter)
         self.sensorGridLabel.setStyleSheet('QLabel {color: black; font-size: 16px}')
         delsysButtonLayout.addWidget(self.sensorGridLabel)
 
@@ -200,54 +298,36 @@ class MyWidget(QMainWindow):
         self.configureButton.setEnabled(False)
         delsysButtonLayout.addWidget(self.configureButton)
 
-        # Data Collection Label
-        self.dataCollectionLabel = QLabel("<b>Data Collection</b>", alignment = Qt.AlignCenter)
-        self.dataCollectionLabel.setStyleSheet('QLabel {color: black; font-size: 16px;}')
-        delsysButtonLayout.addWidget(self.dataCollectionLabel)
-
-        # Data Collection Layout
-        dataCollectionButtonLayout = QHBoxLayout()
-
-        # Data Collection Button
-        self.startDataCollectionButton = QPushButton("Start", self)
-        self.startDataCollectionButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.startDataCollectionButton.objectName = 'Start Collection'
-        self.startDataCollectionButton.clicked.connect(self.startDataCollectionCallback)
-        self.startDataCollectionButton.setStyleSheet('color: grey;')
-        self.startDataCollectionButton.setEnabled(False)
-        dataCollectionButtonLayout.addWidget(self.startDataCollectionButton)
-
-        # Stop Data Collection Button
-        self.stopDataCollectionButton = QPushButton("Stop", self)
-        self.stopDataCollectionButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.stopDataCollectionButton.objectName = 'Start Collection'
-        self.stopDataCollectionButton.clicked.connect(self.stopDataCollectionCallback)
-        self.stopDataCollectionButton.setStyleSheet('color: grey;')
-        self.stopDataCollectionButton.setEnabled(False)
-        dataCollectionButtonLayout.addWidget(self.stopDataCollectionButton)
-
-        # Adding Collection Panel to Main
-        delsysButtonLayout.addLayout(dataCollectionButtonLayout)
-
         # Setting Button Panel
         delsysButtonPanel.setLayout(delsysButtonLayout)
 
         return delsysButtonPanel
     
+    # Data Processing Pipeline
     def dataProcessing(self):
         # Data Processing Pipeline
-        self.recording = True
-        # while self.recording is True:
-        # time.sleep(0.001)
-        try:
-            self.DelsysEMG.processData()
-            averageEMG = self.DelsysEMG.plotEMGGUI()
-            self.EMGPlot.plotEMG(averageEMG)
-        except:
-            pass
-    
+        if self.recording:
+            try:
+                self.DelsysEMG.processData()
+                averageEMG = self.DelsysEMG.plotEMGGUI()
+                self.EMGPlot.plotEMG(averageEMG)
 
-# Need to add in a way to remove buttons from the grid
+                if self.xSensorTimer >= self.xSensorWidget.frameDelay:
+                    self.xSensorWidget.processDataCallback()
+                    self.xSensorTimer = 0
+                else:
+                    self.xSensorTimer += 1
+            except Exception as e:
+                print(e)
+        
+        # Video Processing
+        if self.videoTimer >= self.videoCapture.frameDelay:
+            self.videoCapture.dataProcessing()
+            self.videoTimer = 0
+        else:
+            self.videoTimer += 1
+    
+    # Function to add and remove sensors from the sensor list on button press
     def button_grid_press(self, value):
         try:
             if (self.sensorsSelected.count(int(value)) > 0):
@@ -259,6 +339,7 @@ class MyWidget(QMainWindow):
         except:
             self.sensorsSelected.append(int(value))
 
+        # Updating Sensor List
         self.sensorSelectedDisplay.setText("Sensors Selected: " + str(self.sensorsSelected))
 
     #-----------------------------------------------------------------------------------
@@ -353,25 +434,74 @@ class MyWidget(QMainWindow):
         # Adding Sensor Plots
         if self.EMGPlot is None:
             self.EMGPlot = EMGPlot(self.DelsysEMG.numEMGChannels, self.DelsysEMG.sensorDict, self.DelsysEMG.EMGSensors)
-            self.splitter.addWidget(self.EMGPlot.plotWidget)
-            widget.resize(1000, 400)
+            self.splitter.insertWidget(1, self.EMGPlot.plotWidget)
+            widget.resize(1700, 400)
 
     # Start Data Collection Callback
     def startDataCollectionCallback(self):
         self.DelsysEMG.startDataCollection()
+        self.recording = True
+        self.videoCapture.recording = True
 
         self.stopDataCollectionButton.setEnabled(True)
         self.stopDataCollectionButton.setStyleSheet("QPushButton {color: black;}")
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
-        self.timer.start()
+        
+        self.saveCollectedDataButton.setEnabled(False)
+        self.saveCollectedDataButton.setStyleSheet("QPushButton {color: grey;}")
+
+        self.dataCollectionTimer.start()
 
     # Stop Data Collection Callback
     def stopDataCollectionCallback(self):
         self.DelsysEMG.stopDataCollection()
-
+        self.videoCapture.recording = False
         self.recording = False
+        self.xSensorWidget.stopDataCollection()
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
-        self.timer.stop()
+        
+        self.saveCollectedDataButton.setEnabled(True)
+        self.saveCollectedDataButton.setStyleSheet("QPushButton {color: black;}")
+
+        self.timeElapsed = self.dataCollectionTimer.elapsed()
+
+    def saveDataCollectionCallback(self):
+        print("called")
+        fileName = simpledialog.askstring(title = 'Trial File Name Input',
+                                                          prompt = 'Please provide a name for this trial (no file extension or date).')
+        #fileName = self.openDialog('Trial File Name Input', 'Please provide a name for this trial (no file extension or date).')
+        self.dataCollector = DataCollector()
+        self.dataCollector.start()
+
+        # Creating Timeseries
+        self.timeSeriesGeneration()
+
+        # Saving to a file
+        if self.dataCollector:
+            today = date.today()
+            self.dataCollector.save_to_csv(self.DelsysEMG.returnAllData(), str(fileName) + '_' + str(today) +'.csv')
+
+        if self.dataCollector is not None:
+            self.dataCollector.stop()
+            self.dataCollector.join()
+            self.dataCollector = None
+
+    def timeSeriesGeneration(self):
+        """
+        Generating Time Series For Export
+        """
+        # Creating array to track channel generation
+        self.timeSeriesTracker = []
+
+        # Looping through Channel Names
+        for index, channel in enumerate(self.DelsysEMG.channelNames):
+            chanName = str.split(channel, " ")[0]
+            if chanName not in self.timeSeriesTracker:
+                self.timeSeriesTracker.append(chanName)
+                if chanName == "EMG":
+                    self.EMGTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
+                if chanName == "GYRO":
+                    self.GYROTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

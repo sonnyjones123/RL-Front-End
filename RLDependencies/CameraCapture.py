@@ -6,6 +6,9 @@ import os
 import time
 
 from DelsysLSLSender import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 
 class CameraCapture:
     """
@@ -28,7 +31,7 @@ class CameraCapture:
             self.audio = pyaudio.PyAudio()
             self.stream = self.audio.open(format = pyaudio.paInt16, channels = 1, rate = 44100, input = True, frames_per_buffer = 1024)
             self.audioBuffer = []
-            CameraCapture.initAudioOutlet(self)
+            self.initAudioOutlet(self)
             
             # Thread
             self.thread = None
@@ -48,7 +51,7 @@ class CameraCapture:
             self.audio = pyaudio.PyAudio()
             self.stream = self.audio.open(format = pyaudio.paInt16, channels = 1, rate = 44100, input = True, frames_per_buffer = 1024)
             self.audioBuffer = None
-            CameraCapture.initAudioOutlet(self)
+            self.initAudioOutlet(self)
             
             # Thread
             self.thread = None
@@ -68,6 +71,11 @@ class CameraCapture:
         while True:
             startTime = time.time()
             ret, frame = self.cap.read()
+
+            if not ret:
+                continue
+            
+            self.frame = frame
             cv2.imshow('Video', frame)
 
             if self.recording:
@@ -105,6 +113,20 @@ def main():
     recording.recording = True
     recording.thread = threading.Thread(target = recording.initCamera)
     recording.thread.start()
+
+
+class Thread(QThread):
+    updateFrame = Signal(QImage)
+
+    def __init__(self, parent = None):
+        QThread.__init__(self, parent)
+        self.CameraCapture = CameraCapture()
+        self.status = True
+
+    def run(self):
+        self.CameraCapture.initCamera()
+        self.rgbFrame = cv2.cvtColor(self.CameraCapture.frame, cv2.COLOR_BGR2RGB)
+        self.updateFrame.emit(self.rgbFrame)
 
 if __name__ == '__main__':
     main()
