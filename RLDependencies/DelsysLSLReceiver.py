@@ -9,7 +9,6 @@ class DelsysLSLReceiver:
     def __init__(self, stream_data_type):
         self.streams = resolve_stream('type', stream_data_type)
         self.inlet = StreamInlet(self.streams[0])
-        
     
     def receiveLSLData(self):
         chunk, time_stamps = self.inlet.pull_chunk()
@@ -25,7 +24,7 @@ class DelsysLSLReceiver:
 def main():
     # first resolve an EEG stream on the lab network
     print("looking for an EEG stream...")
-    streams = resolve_stream('type', 'Audio')
+    streams = resolve_stream('type', 'EMG')
 
     # create a new inlet to read from the stream
     inlet = StreamInlet(streams[0])
@@ -34,6 +33,7 @@ def main():
         # get a new sample (you can also omit the timestamp part if you're not
         # interested in it)
         chunk, timestamps = inlet.pull_chunk()
+        #print(timestamps)
         if timestamps:
             print(timestamps, chunk)
 

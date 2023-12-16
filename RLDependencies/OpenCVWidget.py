@@ -108,12 +108,11 @@ class VideoWidget(QWidget):
             self.audioBuffer.append(audioData)
 
     # Releasing Camera and Output Stream
-    def closeEvent(self, event):
+    def releaseConfig(self):
         self.cap.release()
         self.videoWriter.release()
         self.stream.close()
         self.audio.terminate()
-        event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

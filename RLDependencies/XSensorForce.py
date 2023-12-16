@@ -236,7 +236,6 @@ class XSensorForce:
             print("XSensor Connection Failed")
             return False
 
-
     def processData(self):
         """
         Data processing function for XSensor. Needs to be called from a loop, each call is one frame. 
@@ -274,17 +273,21 @@ class XSensorForce:
                     self.dataBuffer[sensor] = frameBuffer
 
             # Appending Data to All Collection Data Buffer
-            self.allCollectionDataBuffer.append(self.dataBuffer)
-                    
+            self.allCollectionDataBuffer.append(self.dataBuffer)        
 
     def stopDataCollection(self):
         """
         Stop data collection.
         """
+        self.connected = False
+
+    def releaseConfig(self):
+        """
+        Releasing XSensor Configuration
+        """
         self.xscore.XS_StopRecord()
         self.xscore.XS_CloseConfig()
         self.xscore.XS_ReleaseConfig()
-        self.connected = False
 
     def quit(self):
         """

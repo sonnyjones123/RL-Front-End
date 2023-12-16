@@ -22,8 +22,8 @@ elif (platform.node() == 'Purkinje'):
 
 from AeroPy.TrignoBase import *
 from AeroPy.DataManager import *
-from RLDependencies.DelsysLSLSender import *
-from RLDependencies.DelsysLSLReceiver import *
+# from RLDependencies.DelsysLSLSender import *
+# from RLDependencies.DelsysLSLReceiver import *
 
 class DelsysEMG:
     """
@@ -31,6 +31,9 @@ class DelsysEMG:
     the Delsys TrignoBase EMG system and API. You will need to install all the dependencies
     and Delsys API software from their Github. The link to the Delsys Github Repository is
     below. 
+
+    Note: We have tested additional functionally with other Delsys products like the Goniometers and EKG with the EMG base and the API. 
+    Everything seems to work as intended.
 
     https://github.com/delsys-inc/Example-Applications/tree/main
 
@@ -52,7 +55,8 @@ class DelsysEMG:
         self.key = "MIIBKjCB4wYHKoZIzj0CATCB1wIBATAsBgcqhkjOPQEBAiEA/////wAAAAEAAAAAAAAAAAAAAAD///////////////8wWwQg/////wAAAAEAAAAAAAAAAAAAAAD///////////////wEIFrGNdiqOpPns+u9VXaYhrxlHQawzFOw9jvOPD4n0mBLAxUAxJ02CIbnBJNqZnjhE50mt4GffpAEIQNrF9Hy4SxCR/i85uVjpEDydwN9gS3rM6D0oTlF2JjClgIhAP////8AAAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBA0IABCs6LASqvLpxqpvzLA8QbLmUDDDlOqD54JhLUEadv+oAgG8JVVDtI0qMO2V2PQiXoKsY33+ea/Jtp12wDA3847g="
         self.license = "<License>  <Id>756caf49-ab7f-407f-970e-89f5933fa494</Id>  <Type>Standard</Type>  <Quantity>10</Quantity>  <LicenseAttributes>    <Attribute name='Software'></Attribute>  </LicenseAttributes>  <ProductFeatures>    <Feature name='Sales'>True</Feature>    <Feature name='Billing'>False</Feature>  </ProductFeatures>  <Customer>    <Name>Sonny Jones</Name>    <Email>sonny.jones@utah.edu</Email>  </Customer>  <Expiration>Fri, 05 Sep 2031 04:00:00 GMT</Expiration>  <Signature>MEUCIDx5YfJ4042zldgXWz+IJi//Z+ZQQ0b0LZoYIjcRm3BvAiEAjXJD2kb1fLqcFLD7/fAOoWOjRHANREyQwjDpDlaLYOg=</Signature></License>"
         self.data = []
-        self.sensorNames = [75503, 75548, 75596, 75587, 75467, 75672, 75641, 75461, 75148, 75268, 75247, 75406]
+        # sensorNames = [Trigno Avanti: 1 - 12, Trigno EKG: 13, Trigno Avanti Goniometer: 14 - end]
+        self.sensorNames = [75503, 75548, 75596, 75587, 75467, 75672, 75641, 75461, 75148, 75268, 75247, 75406, 69065, 69657, 69699]
         self.sensorDict = {}
         self.numSensors = 16
         self.numSensorsConnected = 0
@@ -67,7 +71,10 @@ class DelsysEMG:
         self.LSLReceiver = 0
 
         # Sample Mode List
-        self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz']
+        self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz', 
+                               'EKG raw (2148 Hz), skin check (74 Hz), +/-5.5mV, 2-30Hz',
+                               'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz',
+                               'SIG raw x4 (519Hz) (x1813)']
 
     def connect(self):
         """ 
@@ -144,7 +151,7 @@ class DelsysEMG:
                     # Asking user for input
                     # sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
                     sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                                                          prompt = 'Please indicate which muscle this sensor is on.', parent=self.ROOT)
+                                                          prompt = 'Please indicate where this sensor is on.', parent=self.ROOT)
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
             tempSensorKey = list(self.sensorDict.keys())
@@ -307,30 +314,34 @@ class DelsysEMG:
             self.EMGSensors = []
             self.numEMGChannels = 0
             self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
+            self.DelsysLSLSensorDict = {}
 
             # Looping through sensor list
             for sensorNum in range(self.sensorsFound):
+                # Sensor Index
+                tempSensorName = f"Sensor: {sensorNum + 1}"
                 # Selecting sensor object
                 selectedSensor = self.TrigBase.GetSensorObject(sensorNum)
                 # Checking to see if sensor channels are greated than 0.
                 if len(selectedSensor.TrignoChannels) > 0:
+                    # Temp Sensor Channel List
+                    tempChannelList = []
                     # Looping through num of channels in sensor sensorNum.
                     for channel in range(len(selectedSensor.TrignoChannels)):
                         self.channelCount += 1
                         self.DataHandler.allcollectiondata.append([])
                         self.channelNames.append(selectedSensor.TrignoChannels[channel].Name)
+                        tempChannelList.append(selectedSensor.TrignoChannels[channel].Name)
                         self.sampleRates.append(selectedSensor.TrignoChannels[channel].SampleRate)
                         self.samplesPerFrame.append(selectedSensor.TrignoChannels[channel].SamplesPerFrame)
 
                         # Updating numEMGChannels
                         if 'EMG' in selectedSensor.TrignoChannels[channel].Name:
                             self.numEMGChannels += 1    
-                            self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])        
+                            self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])
 
-            # Create LSLSender object, assuming sample rates are the same for all EMG sensors
-            # self.LSLSender = DelsysLSLSender("Delsys", "EMG", self.numSensorsConnected, self.sampleRates[0])
-            # self.LSLSender.createOutlet(self.channelNames, self.sampleRates)
-            # self.LSLReceiver = DelsysLSLReceiver("EMG")
+                        # Adding Sensor and Channel List to Dict
+                        self.DelsysLSLSensorDict[tempSensorName] = tempChannelList        
 
     def startDataCollection(self):
         # Starting Data Collection
@@ -465,28 +476,32 @@ class DelsysEMG:
         Plotting EMG data by taking the average value of data within self.data. Will reset the buffer after each iteration.
         """
         averageEMG = []
+        # emgData = []
 
         # Looping through self.data
         try:
             if (len(self.data) != 0):
                 for i in range(len(self.channelNames)):
                     if "EMG" in self.channelNames[i]:
+                        # emgData.append(self.data[0][i])
                         avg_data = np.average(self.data[0][i])
                         averageEMG.append(avg_data)
             else:
                 averageEMG = np.zeros(self.sensorsFound)
+                pass
 
         except Exception as e:
             print(480)
             print(e)
             averageEMG = np.zeros(self.sensorsFound)
-
+            pass
 
         # Resetting Buffer
         self.data = []
 
         # Returning string formatted EMG data
         return averageEMG
+        #return emgData
     
     def returnAllData(self):
         return self.DataHandler.allcollectiondata

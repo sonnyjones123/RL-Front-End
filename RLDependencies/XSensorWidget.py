@@ -37,6 +37,7 @@ class XSensorWidget(QWidget):
         self.layout.addWidget(self.splitter)
         self.sensorData = []
         self.frameDelay = 1000/self.XSensorForce.targetRateHz
+        self.ready = False
 
     #-----------------------------------------------------------------------------------
     # ---- XSensor Control and Display Widget
@@ -78,7 +79,6 @@ class XSensorWidget(QWidget):
         self.connectButton.setStyleSheet("color: grey")
         self.connectButton.setEnabled(False)
         XSensorPanelLayout.addWidget(self.connectButton)
-
         """
         # Process Data Button
         self.processDataButton = QPushButton("Process Data", self)
@@ -107,7 +107,6 @@ class XSensorWidget(QWidget):
         self.quitButton.setEnabled(False)
         XSensorPanelLayout.addWidget(self.quitButton)
         """
-
         # Setting Panel Layout
         XSensorPanel.setLayout(XSensorPanelLayout)
 
@@ -169,7 +168,8 @@ class XSensorWidget(QWidget):
             self.numRows = self.XSensorForce.senselRows.value
             self.numCols = self.XSensorForce.senselColumns.value
             self.minValue = self.XSensorForce.minPressureRange.value
-            self.maxValue = self.XSensorForce.maxPressureRange.value
+            # self.maxValue = self.XSensorForce.maxPressureRange.value
+            self.maxValue = 40
 
             # Adding Display
             for sensor in range(self.XSensorForce.numSensors):
@@ -209,6 +209,7 @@ class XSensorWidget(QWidget):
                 # self.quitButton.setStyleSheet("color: black")
                 self.XSensorStatus = "Connected"
                 self.XSensorStatusLabel.setText("<b> XSensor Status: " + self.XSensorStatus)
+                self.ready = True
         except:
             pass
 
@@ -225,16 +226,23 @@ class XSensorWidget(QWidget):
     # Stop Data Collection
     def stopDataCollection(self):
         self.XSensorForce.stopDataCollection()
-        self.XSensorStatus = "Idle"
+        self.XSensorStatus = "Connected"
         self.XSensorStatusLabel.setText("<b> XSensor Status: " + self.XSensorStatus)
+
+    # Releasing and Quitting Callback
+    def releaseAndQuit(self):
+        self.XSensorForce.releaseConfig()
+        self.XSensorForce.quit()
 
     #-----------------------------------------------------------------------------------
     # ---- XSensor Display Callbacks
 
     # Getting color for display
     def getColor(self, value):
+        if value > self.maxValue:
+            self.maxValue = value
         mappedValue = abs((value - self.minValue) / (self.maxValue - self.minValue))
-        return QColor(int(255 * (1 - mappedValue)), int(255 * mappedValue), 0)
+        return QColor(int(255 * mappedValue), int(255 * (1 - mappedValue)), 0)
 
     # Display Update Function
     def updateDisplay(self):

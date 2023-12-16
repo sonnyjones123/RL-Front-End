@@ -10,6 +10,8 @@ class SelectiveKanervaCoding():
         
         # Creating Randomized P
         self.P = np.random.rand(self.K, self.n)
+        # [TODO]
+        # Ask how to properly set up prototypes
         
     #-----------------------------------------------------------------------------------
     # ---- SKC Update Algorithm
