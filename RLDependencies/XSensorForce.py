@@ -102,6 +102,10 @@ class XSensorForce:
         # Configuration status
         self.connected = False
 
+        # Data Saving File Structure
+        self.dataSavingSensorDict = {}
+        self.tempChanList = ['Pressure']
+
         # query the DLL version (for XSENSOR support reference)
         self.xscore.XS_GetVersion(ctypes.byref(self.wMajor), ctypes.byref(self.wMinor), ctypes.byref(self.wRevision), ctypes.byref(self.wBuild))
 
@@ -201,11 +205,16 @@ class XSensorForce:
             self.xscore.XS_SensorNameUTF8(sensorPID, ctypes.byref(self.nameBufferSize), ctypes.byref(nameBuff))
             sensorName = str(nameBuff.value.decode('utf-8'))
 
-            # an alternate to using UTF8 is to use the Unicode 16 (wchar_t) calls
-            # xscore.XS_SensorName(sensorPID, ctypes.byref(nameBufferSize), None)
-            # nameBuff =  (ctypes.c_wchar*(nameBufferSize.value))()
-            # xscore.XS_SensorName(sensorPID, ctypes.byref(nameBufferSize), ctypes.byref(nameBuff))
-            # sensorName = str(nameBuff.value)
+            # Setting up Data Saving Dictionary
+            tempName = f'Foot {self.sensorIndex}'
+            if sensorName.split('-')[2] == 'LF':
+                tempSensorOrientation = 'Left'
+            elif sensorName.split('-')[2] == 'RF':
+                tempSensorOrientation = 'Right'
+
+            self.dataSavingSensorDict[tempName] = {'Channels' : self.tempChanList,
+                                                   'SampleRates' : [self.targetRateHz],
+                                                   'Foot' : tempSensorOrientation}
 
             sMesg = '\tSensor Info PID ' + str(sensorPID) + '; Serial S' + str(serialNbr) + '; [' + sensorName + ']'
             print (sMesg)
@@ -231,6 +240,12 @@ class XSensorForce:
         if (self.xscore.XS_OpenConfig() == True) and (self.xscore.XS_StartRecord(self.targetRateHz) == True):
             self.connected = True
             print('XSensor Connection Established')
+
+            # Printing sensorDict
+            print(self.dataSavingSensorDict.keys())
+            for key, value in self.dataSavingSensorDict.items():
+                print(f"{key} : {value}")
+
             return True
         else:
             print("XSensor Connection Failed")

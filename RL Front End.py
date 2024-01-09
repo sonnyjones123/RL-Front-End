@@ -24,8 +24,7 @@ from RLDependencies.EMGPlot import *
 from RLDependencies.DelsysEMG import *
 from RLDependencies.OpenCVWidget import *
 from RLDependencies.XSensorWidget import *
-from RLDependencies.DelsysLSLSender import *
-from RLDependencies.DelsysLSLReceiver import *
+from RLDependencies.DataFileHandler import *
 
 class DataCollector(threading.Thread):
     def __init__(self):
@@ -102,8 +101,8 @@ class MyWidget(QMainWindow):
         self.DelsysLSLSender = 0
 
         # Data Saving Location
+        self.DataFileHandler = None
         self.saveLocation = "C:/Users/Purkinje/Box/NeuroRoboticsLab/NERVES Lab/Project Groups/ML Gait/Experimental Data/"
-        self.saveFolder = f"Trial: {date.today()}"
 
     #-----------------------------------------------------------------------------------
     # ---- Delsys Control Widget
@@ -116,12 +115,70 @@ class MyWidget(QMainWindow):
         # Creating Widget Params
         delsysButtonPanel = QWidget()
         delsysButtonLayout = QVBoxLayout()
-        delsysButtonPanel.setFixedSize(400, 600)
+        delsysButtonPanel.setFixedSize(400, 700)
 
         # Data Collection Label
         self.dataCollectionLabel = QLabel("<b>Data Collection</b>", alignment = Qt.AlignCenter)
         self.dataCollectionLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
         delsysButtonLayout.addWidget(self.dataCollectionLabel)
+
+        # File Configuration Section
+        self.fileConfigSectionHead = QLabel("<b>File Configuration", alignment = Qt.AlignCenter)
+        self.fileConfigSectionHead.setStyleSheet('QLabel {color: black;}')
+        delsysButtonLayout.addWidget(self.fileConfigSectionHead)
+
+        # Data File Creating Layout
+        dataCreationLayout = QHBoxLayout()
+
+        # Experiment Name Text Entry
+        self.experimentNameEntry = QLineEdit(self)
+        self.experimentNameEntry.setAlignment(Qt.AlignCenter)
+        self.experimentNameEntry.setText("Enter Experiment Name")
+        self.experimentNameEntry.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.experimentNameEntry.objectName = "Experiment Name"
+        self.experimentNameEntry.setStyleSheet('QLineEdit {color: black;}')
+        dataCreationLayout.addWidget(self.experimentNameEntry)
+
+        # Trial Number Dropdown
+        self.trialNames = ['Trial 1', 'Trial 2', 'Trial 3', 'Trial 4', 'Trial 5', 'Trial 6', 'Trial 7', 'Trial 8', 'Trial 9', 'Trial 10']
+        self.trialEntry = QComboBox(self)
+        self.trialEntry.addItems(self.trialNames)
+        self.trialEntry.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.trialEntry.objectName = 'Trial Number Dropdown'
+        self.trialEntry.setStyleSheet('QComboBox {color: black;}')
+        dataCreationLayout.addWidget(self.trialEntry)
+
+        # Adding to main layout
+        delsysButtonLayout.addLayout(dataCreationLayout)
+
+        # File Editing Panel
+        fileEditingPanel = QHBoxLayout()
+
+        # Configure Data File Button
+        self.configureDataFileButton = QPushButton("Config File", self)
+        self.configureDataFileButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.configureDataFileButton.objectName = 'Configure Data File'
+        self.configureDataFileButton.clicked.connect(self.configureDataFileCallback)
+        self.configureDataFileButton.setStyleSheet('color: black;')
+        self.configureDataFileButton.setEnabled(True)
+        fileEditingPanel.addWidget(self.configureDataFileButton)
+
+        # Manual Closing File Option
+        self.closeDataFileButton = QPushButton("Close File", self)
+        self.closeDataFileButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.closeDataFileButton.objectName = "Close Data File"
+        self.closeDataFileButton.clicked.connect(self.closeDataFileCallback)
+        self.closeDataFileButton.setStyleSheet('color: grey;')
+        self.closeDataFileButton.setEnabled(False)
+        fileEditingPanel.addWidget(self.closeDataFileButton)
+
+        # Adding to delsys Button Layout
+        delsysButtonLayout.addLayout(fileEditingPanel)
+
+        # Data Collection Panel Label
+        self.dataStartStopLabel = QLabel('<b>Start Stop Buttons</b>', alignment = Qt.AlignCenter)
+        self.dataStartStopLabel.setStyleSheet('QLabel {color: black;}')
+        delsysButtonLayout.addWidget(self.dataStartStopLabel)
 
         # Data Collection Layout
         dataCollectionButtonLayout = QHBoxLayout()
@@ -329,8 +386,8 @@ class MyWidget(QMainWindow):
                 # Delsys Data Polling and Update
                 self.DelsysEMG.processData()
 
-                # Sending data off through LSL
-                # self.DelsysLSLSender.sendLSLData(self.DelsysEMG.data)
+                # Saving data to hdf5 file
+                #self.DelsysEMG.data
                 # Buffer is cleared in plotEMGGUI
                 averageEMG = self.DelsysEMG.plotEMGGUI()                
 
@@ -378,6 +435,9 @@ class MyWidget(QMainWindow):
         # Releasing XSensor
         self.xSensorWidget.releaseAndQuit()
         
+        # Closing Data File
+        self.DataFileHandler.closeFile()
+        
         # Releasing Camera and Audio
         self.videoCapture.releaseConfig()
 
@@ -397,9 +457,14 @@ class MyWidget(QMainWindow):
         self.DelsysEMG.connect()
 
         # Updating GUI
+        # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+        # Pair Sensor Button
         self.pairSensorButton.setEnabled(True)
         self.pairSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+        # Scan Sensor Button
         self.scanSensorButton.setEnabled(True)
         self.scanSensorButton.setStyleSheet('QPushButton {color: black;}')
     
@@ -409,11 +474,18 @@ class MyWidget(QMainWindow):
         self.DelsysEMG.connectSensors(self.sensorNumber.text())
 
         # Updating GUI
+        # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+        # Select Sensor Button
         self.selectSensorButton.setEnabled(True)
         self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+        # Select All Sensor Button
         self.selectAllSensorButton.setEnabled(True)
         self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+        # Reset Sensor Button
         self.resetSensorSelection.setEnabled(True)
         self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
 
@@ -423,11 +495,18 @@ class MyWidget(QMainWindow):
         self.DelsysEMG.connectSensors(0)
 
         # Updating GUI
+        # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+        # Select Sensor Button
         self.selectSensorButton.setEnabled(True)
         self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+        # Select All Sensor Button
         self.selectAllSensorButton.setEnabled(True)
         self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+        # Reset Sensor Selection Button
         self.resetSensorSelection.setEnabled(True)
         self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
 
@@ -438,9 +517,14 @@ class MyWidget(QMainWindow):
             self.DelsysEMG.selectSensor(sensor)
 
         # Updating GUI
+        # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+        # Set Sample Mode Button
         self.setSampleMode.setEnabled(True)
         self.setSampleMode.setStyleSheet('QPushButton {color: black;}')
+
+        # Set All Sample Mode Button
         self.setAllSampleMode.setEnabled(True)
         self.setAllSampleMode.setStyleSheet('QPushButton {color: black;}')
 
@@ -450,9 +534,14 @@ class MyWidget(QMainWindow):
         self.DelsysEMG.selectAllSensors()
 
         # Updating GUI
+        # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+        # Set Sample Mode Button
         self.setSampleMode.setEnabled(True)
         self.setSampleMode.setStyleSheet('QPushButton {color: black;}')
+
+        # Set All Sample Mode Button
         self.setAllSampleMode.setEnabled(True)
         self.setAllSampleMode.setStyleSheet('QPushButton {color: black;}')
 
@@ -499,16 +588,76 @@ class MyWidget(QMainWindow):
             self.splitter.insertWidget(1, self.EMGPlot.plotWidget)
             widget.resize(1700, 400)
 
-        # Updating Start Button
-        if self.ready: # and self.xSensorWidget.ready
-            self.startDataCollectionButton.setEnabled(True)
-            self.startDataCollectionButton.setStyleSheet('QPushButton {color: black;}')
+    # Configuring File for Data Saving
+    def configureDataFileCallback(self):
+        print("Configuring Save File...")
 
-        # Initializing the LSL stream
-# Currently broken here, needs to have data formatted correctly
-        # self.DelsysLSLSender = DelsysLSLSender("RLDataCollection", "CollectionBundle", self.DelsysEMG.channelCount, 'myuid1234')
-        # self.DelsysLSLSender.createOutlet(self.DelsysEMG.DelsysLSLSensorDict, self.DelsysEMG.sampleRates)
+        if self.ready and self.xSensorWidget.ready:
+            try:
+                # Creating file
+                if self.DataFileHandler is None:
+                    self.experimentName = self.experimentNameEntry.text()
 
+                    # Creating file save location path
+                    savePath = os.path.join(self.saveLocation, self.experimentName)
+
+                    # Creating object and initializing save location
+                    self.DataFileHandler = DataFileHandler(savePath)
+
+                # Creating file object
+                self.DataFileHandler.createFile(self.trialEntry.currentText())
+
+                # Formatting File
+                self.DataFileHandler.formatFile(self.DelsysEMG.dataSavingSensorDict, self.xSensorWidget.XSensorForce.dataSavingSensorDict)
+
+                # Updating Close Data File Button
+                self.closeDataFileButton.setEnabled(True)
+                self.closeDataFileButton.setStyleSheet('QPushButton {color: black;}')
+
+                # Updating Config File Button
+                self.configureDataFileButton.setEnabled(False)
+                self.configureDataFileButton.setStyleSheet('QPushButton {color: grey;}')
+
+                # Updating Start Button
+                self.startDataCollectionButton.setEnabled(True)
+                self.startDataCollectionButton.setStyleSheet('QPushButton {color: black;}')
+
+                print("Successfully Configured File")
+
+            except Exception as e:
+                print(e)
+                print("Unable to configure file")
+
+        else:
+            print('Delsys and XSensor Not Ready')
+
+    # Manual Callback for Closing Data File
+    def closeDataFileCallback(self):
+        print("Closing Save File...")
+        try:
+            # Checking if Data File Handler Exists
+            if self.DataFileHandler:
+                # Closing Data File
+                self.DataFileHandler.closeFile()
+
+            # Updating Close Data File Button
+            self.closeDataFileButton.setEnabled(False)
+            self.closeDataFileButton.setStyleSheet('QPushButton {color: grey;}')
+
+            # Updating Config File Button
+            self.configureDataFileButton.setEnabled(True)
+            self.configureDataFileButton.setStyleSheet('QPushButton {color: black;}')
+
+            # Updating Start Button
+            self.startDataCollectionButton.setEnabled(False)
+            self.startDataCollectionButton.setStyleSheet('QPushButton {color: grey;}')
+
+            # Print Status
+            print("Successfully Closed Save File")
+
+        except Exception as e:
+            print(e)
+            print("Unable to Close File")
 
     # Start Data Collection Callback
     def startDataCollectionCallback(self):
@@ -519,11 +668,20 @@ class MyWidget(QMainWindow):
         self.videoCapture.recording = True
 
         # Updating GUI
+        # Stop Data Collection Button
         self.stopDataCollectionButton.setEnabled(True)
         self.stopDataCollectionButton.setStyleSheet("QPushButton {color: black;}")
+
+        # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+        # Save Data Button
         self.saveCollectedDataButton.setEnabled(False)
         self.saveCollectedDataButton.setStyleSheet("QPushButton {color: grey;}")
+
+        # Close Data File Button
+        self.closeDataFileButton.setEnabled(False)
+        self.closeDataFileButton.setStyleSheet('QPushButton {color: grey;}')
 
         # Starting Timer
         self.dataCollectionTimer.start()
@@ -538,12 +696,18 @@ class MyWidget(QMainWindow):
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
         
         # Updating GUI
+        # Save Colleciont Data Button
         self.saveCollectedDataButton.setEnabled(True)
         self.saveCollectedDataButton.setStyleSheet("QPushButton {color: black;}")
+
+        # Close Data File Button
+        self.closeDataFileButton.setEnabled(True)
+        self.closeDataFileButton.setStyleSheet('QPushButton {color: black;}')
 
         # Saving Elapsed Time
         self.timeElapsed = self.dataCollectionTimer.elapsed()
 
+    # Save data after a trial has been completed
     def saveDataCollectionCallback(self):
         print("called")
         fileName = simpledialog.askstring(title = 'Trial File Name Input',
@@ -566,12 +730,18 @@ class MyWidget(QMainWindow):
             self.dataCollector = None
 
     #-----------------------------------------------------------------------------------
-    # ---- Data Saving Functions
+    # ---- Data Saving Functions for Saving Data Continuously       
+    def createDataObject(self):
+        """
+        Creates and initializes data saving object that will be used to manage all data saving.
+        """
+        # Creating data saving object
+        self.DataFileHandler = DataFileHandler("TestingLiveDataSaving")
 
-    def generateSaveFiles(self):
-        """
-        Generating save files for data export
-        """
+        # Looping through channel names
+        for key, value in self.DelsysEMG.dataSavingSensorDict.items():
+            for channel in value['channelNames']:
+                pass
 
     def timeSeriesGeneration(self):
         """

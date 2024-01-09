@@ -180,7 +180,8 @@ class XSensorWidget(QWidget):
                     exec(f"self.splitter.addWidget(self.XSensorVisualPanel{sensor})")
                     self.sensorDisplayTrack.append(f"XSensorVisualPanel{sensor}")
 
-        except:
+        except Exception as e:
+            print(e)
             self.XSensorStatus = "Configure Failed"
             self.XSensorStatusLabel.setText("<b> XSensor Status: " + self.XSensorStatus)
 
@@ -191,22 +192,25 @@ class XSensorWidget(QWidget):
         # Updating Connect Button
         self.connectButton.setEnabled(True)
         self.connectButton.setStyleSheet("color: black")
+        """
+        self.stopButton.setEnabled(True)
+        self.stopButton.setStyleSheet("color: black")
 
-        # self.stopButton.setEnabled(True)
-        # self.stopButton.setStyleSheet("color: black")
-
-        # self.quitButton.setEnabled(True)
-        # self.quitButton.setStyleSheet("color: black")
+        self.quitButton.setEnabled(True)
+        self.quitButton.setStyleSheet("color: black")
+        """
 
     # Start Data Collection Callback
     def connectXSensorCallback(self):
         try:
             status = self.XSensorForce.connect()
             if status:
-                # self.processDataButton.setEnabled(True)
-                # self.processDataButton.setStyleSheet("color: black")
-                # self.quitButton.setEnabled(True)
-                # self.quitButton.setStyleSheet("color: black")
+                """
+                self.processDataButton.setEnabled(True)
+                self.processDataButton.setStyleSheet("color: black")
+                self.quitButton.setEnabled(True)
+                self.quitButton.setStyleSheet("color: black")
+                """
                 self.XSensorStatus = "Connected"
                 self.XSensorStatusLabel.setText("<b> XSensor Status: " + self.XSensorStatus)
                 self.ready = True
