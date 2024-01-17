@@ -23,7 +23,7 @@ class EMGPlot(QWidget):
         self.numGraphs = numGraphs
         self.sensorDict = sensorDict
         self.EMGSensors = EMGSensors
-        self.bufferSize = 5000
+        self.bufferSize = 600
         self.samples = np.arange(-(self.bufferSize - 1), 1)
         self.sampleCount = 0
         self.plottingBuffer = np.zeros((self.numGraphs, self.bufferSize))

@@ -21,7 +21,7 @@ class MyWidget(QWidget):
         self.splitter = QSplitter(self)
         self.splitter.addWidget(self.DelsysButtonPanel)
         self.EMGPlot = None
-        self.videoCapture = VideoWidget()
+        self.videoCapture = VideoWidget("C:/Users/Purkinje/Box/NeuroRoboticsLab/NERVES Lab/Project Groups/ML Gait/Experimental Data/")
         self.splitter.addWidget(self.videoCapture)
         layout = QHBoxLayout()
         self.setStyleSheet("background-color:#f5e1fd;")

@@ -75,6 +75,9 @@ class DelsysEMG:
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-5.5mV, 2-30Hz',
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz',
                                'SIG raw x4 (519Hz) (x1813)']
+        
+        # Data Saving File Structure
+        self.dataSavingSensorDict = None
 
     def connect(self):
         """ 
@@ -314,34 +317,45 @@ class DelsysEMG:
             self.EMGSensors = []
             self.numEMGChannels = 0
             self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
-            self.DelsysLSLSensorDict = {}
+            self.dataSavingSensorDict = {}
+
+            # Sensor Names
+            sensorNames = self.TrigBase.GetSensorNames()
 
             # Looping through sensor list
             for sensorNum in range(self.sensorsFound):
-                # Sensor Index
-                tempSensorName = f"Sensor: {sensorNum + 1}"
+                # Creating temp sensor name
+                tempSensorName = f"Sensor {sensorNum}"
                 # Selecting sensor object
                 selectedSensor = self.TrigBase.GetSensorObject(sensorNum)
                 # Checking to see if sensor channels are greated than 0.
                 if len(selectedSensor.TrignoChannels) > 0:
-                    # Temp Sensor Channel List
-                    tempChannelList = []
+                    # Creating temp chanName and sampleRate lists
+                    tempChanNameList = []
+                    tempSampRateList = []
                     # Looping through num of channels in sensor sensorNum.
                     for channel in range(len(selectedSensor.TrignoChannels)):
                         self.channelCount += 1
                         self.DataHandler.allcollectiondata.append([])
                         self.channelNames.append(selectedSensor.TrignoChannels[channel].Name)
-                        tempChannelList.append(selectedSensor.TrignoChannels[channel].Name)
                         self.sampleRates.append(selectedSensor.TrignoChannels[channel].SampleRate)
                         self.samplesPerFrame.append(selectedSensor.TrignoChannels[channel].SamplesPerFrame)
+                        tempChanNameList.append(selectedSensor.TrignoChannels[channel].Name)
+                        tempSampRateList.append(selectedSensor.TrignoChannels[channel].SampleRate)
+                        # Adding in start and stop times
 
                         # Updating numEMGChannels
                         if 'EMG' in selectedSensor.TrignoChannels[channel].Name:
                             self.numEMGChannels += 1    
-                            self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])
+                            self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])  
+                    
+                    tempChanNameList.append('StartTime')
+                    tempChanNameList.append('EndTime')
 
-                        # Adding Sensor and Channel List to Dict
-                        self.DelsysLSLSensorDict[tempSensorName] = tempChannelList        
+                # Adding to DataSavingSensorDict
+                self.dataSavingSensorDict[tempSensorName] = {'Channels': tempChanNameList,
+                                                             'SampleRates' : tempSampRateList,
+                                                             'Attachment' : self.sensorDict[list(self.sensorDict.keys())[sensorNum]][1]}
 
     def startDataCollection(self):
         # Starting Data Collection
@@ -350,7 +364,6 @@ class DelsysEMG:
                 self.TrigBase.Start()
                 print('Data Collection Started')
             except Exception as e:
-                print(342)
                 print(e)
                 pass
         else:
@@ -399,26 +412,9 @@ class DelsysEMG:
                     self.DataHandler.sampleCount += len(outArr[0][0])
                 except:
                     pass
-                        
-                # Send data off through LSL
-                dataToSend = np.array([])
-                dataColumnIterator = 0
-                # Take self.data and save to a file
-                if len(self.data) != 0:
-                    for i in range(len(self.channelNames)):
-                        if "EMG" in self.channelNames[i]:
-                            if dataColumnIterator == 0:
-                                dataToSend = self.data[0][i]
-                            else:
-                                dataToSend = np.dstack((dataToSend, self.data[0][i]))
-                            dataColumnIterator += 1
-
-                # Sending data over LSL
-                # self.LSLSender.sendLSLData(dataToSend)
-                
-                # print(received_data)
                 
             except IndexError as e:
+                print("Delsys EMG Process data function index error.")
                 print(e)
 
     def stopDataCollection(self):
@@ -461,7 +457,6 @@ class DelsysEMG:
                 averageEMG.append(np.zeros(self.sensorsFound))
 
         except Exception as e:
-            print(453)
             print(e)
             averageEMG.append(np.zeros(self.sensorsFound))
 
@@ -491,7 +486,6 @@ class DelsysEMG:
                 pass
 
         except Exception as e:
-            print(480)
             print(e)
             averageEMG = np.zeros(self.sensorsFound)
             pass

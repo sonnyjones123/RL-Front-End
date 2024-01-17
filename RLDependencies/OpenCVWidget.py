@@ -7,6 +7,7 @@ import time
 import numpy as np
 import pyaudio
 import cv2
+import wave
 
 # from DelsysLSLSender import *
 from PySide6.QtCore import *
@@ -21,7 +22,7 @@ class VideoWidget(QWidget):
     video and audio files to a speficied location.
 
     Author: Sonny Jones & Grange Simpson
-    Version: 2023.11.10
+    Version: 2024.01.17
 
     Usage:
 
@@ -31,7 +32,7 @@ class VideoWidget(QWidget):
         sys.exit(app.exec())
 
     """
-    def __init__(self):
+    def __init__(self, filePath = None):
         super().__init__()
 
         self.videoPanel = self.openCVPanel()
@@ -46,14 +47,29 @@ class VideoWidget(QWidget):
         # self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.frameRate = 30
         self.frameDelay = 1000 // self.frameRate
-        self.videoWriter = cv2.VideoWriter('OpenCVWidget.avi', cv2.VideoWriter_fourcc(*'XVID'), 30.0, (1280, 720))
-        self.outputWidth = 1280
-        self.outputHeight = 720
+        self.videoWriter = None
+
+        # 720p resolution
+        # self.outputWidth = 1280
+        # self.outputHeight = 720
+
+        # 1080p resolution
+        self.outputWidth = 1920
+        self.outputHeight = 1080
 
         # Setting Audio Capture Settings
+        self.format = pyaudio.paInt16
+        self.channels = 2
+        self.rate = 44100
+        self.framesPerBuffer = 1024
+
         self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(format = pyaudio.paInt16, channels = 1, rate = 44100, input = True, frames_per_buffer = 1024)
+        self.stream = self.audio.open(format = self.format, channels = self.channels, rate = self.rate, input = True, frames_per_buffer = self.framesPerBuffer)
         self.audioBuffer = []
+        self.audioWriter = None
+        
+        # Saving Location
+        self.filePath = filePath
 
     #-----------------------------------------------------------------------------------
     # ---- OpenCV Display Widget
@@ -83,6 +99,63 @@ class VideoWidget(QWidget):
     #-----------------------------------------------------------------------------------
     # ---- Update and Exit Functions
 
+    # Creating Outlet
+    def createOutlet(self, fileName = None):
+         # If video writer object is none
+        if self.videoWriter is None:
+            # If filePath is provided
+            if fileName == None:
+                # Default Name
+                defaultName = 'OpenCVWidget.avi'
+
+                # Creating Complete Path with Default Name
+                completePath = os.path.join(self.filePath, defaultName)
+
+                # Creating Outlet
+                self.videoWriter = cv2.VideoWriter(completePath, cv2.VideoWriter_fourcc(*'XVID'), 30.0, (self.outputWidth, self.outputHeight))
+            else:
+                # Formatting Custom File Name
+                customFileName = f"{fileName}.avi"
+
+                # Creating Complete Path
+                completePath = os.path.join(self.filePath, customFileName)
+
+                # Creating Outlet
+                self.videoWriter = cv2.VideoWriter(completePath, cv2.VideoWriter_fourcc(*'XVID'), 30.0, (self.outputWidth, self.outputHeight))
+        else:
+            print("Video Outlet Already Exists")
+
+        # If audio writer object is none
+        if self.audioWriter is None:
+            # If filePath is provided
+            if fileName == None:
+                # Default name
+                defaultName = 'OpenCVWidget.wav'
+
+                # Creating Complete Path with Default Name
+                completePath = os.path.join(self.filePath, defaultName)
+
+                # Creating Outlet
+                self.audioWriter = wave.open(completePath, 'wb')
+
+            else:
+                # Formatting Custom File Name
+                customFileName = f"{fileName}.wav"
+
+                # Creating Complete Path
+                completePath = os.path.join(self.filePath, customFileName)
+
+                # Creating Outlet
+                self.audioWriter = wave.open(completePath, 'wb')
+
+            # Setting attributes
+            self.audioWriter.setnchannels(self.channels)
+            self.audioWriter.setsampwidth(self.audio.get_sample_size(self.format))
+            self.audioWriter.setframerate(self.rate)
+
+        else:
+            print("Audio Outlet Already Exists")
+
     # Update Frame Function
     def updateFrame(self):
         # Reading Frame
@@ -105,12 +178,22 @@ class VideoWidget(QWidget):
     def saveAudio(self):
         if self.recording:
             audioData = self.stream.read(1024)
-            self.audioBuffer.append(audioData)
+            self.audioWriter.writeframes(audioData)
+            
+    # Releasing Outlet
+    def releaseOutlet(self):
+        if self.videoWriter:
+            self.videoWriter.release()
+            self.videoWriter = None
+
+        if self.audioWriter:
+            self.audioWriter.close()
+            self.audioWriter = None
 
     # Releasing Camera and Output Stream
     def releaseConfig(self):
         self.cap.release()
-        self.videoWriter.release()
+        self.releaseOutlet()
         self.stream.close()
         self.audio.terminate()
 

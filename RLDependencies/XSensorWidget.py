@@ -68,7 +68,7 @@ class XSensorWidget(QWidget):
         self.configureButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.configureButton.objectName = 'Configure Button'
         self.configureButton.clicked.connect(self.configureXSensorCallback)
-        self.configureButton.setEnabled(True)
+        self.configureButton.setEnabled(False)
         XSensorPanelLayout.addWidget(self.configureButton)
 
         # Connect Button
@@ -199,7 +199,7 @@ class XSensorWidget(QWidget):
         self.quitButton.setEnabled(True)
         self.quitButton.setStyleSheet("color: black")
         """
-
+        
     # Start Data Collection Callback
     def connectXSensorCallback(self):
         try:
@@ -211,6 +211,7 @@ class XSensorWidget(QWidget):
                 self.quitButton.setEnabled(True)
                 self.quitButton.setStyleSheet("color: black")
                 """
+                
                 self.XSensorStatus = "Connected"
                 self.XSensorStatusLabel.setText("<b> XSensor Status: " + self.XSensorStatus)
                 self.ready = True

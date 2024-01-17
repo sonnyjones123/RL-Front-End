@@ -6,7 +6,10 @@ from datetime import datetime
 class DataFileHandler():
     """
     This is a Data File Handler Class that is used to save data live to files during experiments. Utilizes
-    numpy and h5py files formats to saving. 
+    numpy and h5py files formats to saving.
+
+    Author: Sonny Jones & Grange Simpson
+    Version: 2024.01.17 
     """
 
     def __init__(self, filePath = None):
@@ -90,9 +93,16 @@ class DataFileHandler():
                     print('Channels and SampleRates are not the same length')
                     pass
 
-                # Creating datasets for each channel
+                # Creating datasets for each channel, 
                 for i in range(len(datasets['Channels'])):
                     print(datasets['Channels'][i])
+                    # Creating channels and adding sample rates for EMG GYROX, GYROY, GYROZ
+                    """
+                    if (i < 4):
+                        self.createChannel(group, datasets['Channels'][i], {'SampleRate' : datasets['SampleRates'][i]})
+                    else:
+                        self.createChannel(group, datasets['Channels'][i])
+                    """
                     self.createChannel(group, datasets['Channels'][i], {'SampleRate' : datasets['SampleRates'][i]})
 
             except Exception as e:
@@ -176,10 +186,42 @@ class DataFileHandler():
         if self.hdf5File == None:
             self.createFile(fileName)
 
+    def addStartTime(self, startTime):
+        # Adding start time as an attribute
+        self.hdf5File.attrs['startTime'] = startTime
+
+    def addStopTime(self, stopTime):
+        # Adding stop time as an attribute
+        self.hdf5File.attrs['stopTime'] = stopTime
+
     def closeFile(self):
         # Checking to see if file exists
-        if self.hdf5File != None:
+        if self.hdf5File is not None:
             # closing file
+            """
+            for sensor in list(self.DelsysFileStructure.keys()):
+                if ("Sensor" in sensor):
+                    for channel in self.DelsysFileStructure[sensor]['Channels']:
+                        try:
+                            # Adding a starting time stamp
+                            if (channel == 'EndTime'):
+                                timeData = self.hdf5File[f'{sensor}/{channel}']
+                                currentTime = datetime.now()
+                                currentSize = timeData.shape[0]
+
+                                timeData.resize(currentSize + 1, axis = 0)
+                                print(list([currentTime.isoformat()]))
+                                # Data is saved as a float which can be converted to a datetime after using datetime.fromtimestamp()
+                                timeData[0:1] = list([currentTime.timestamp()])
+
+                            else:                               
+                                continue
+
+                        except Exception as e:
+                            print(e)
+                            print(f"Unable to add data to {sensor} : {channel}")
+            """
+
             self.hdf5File.close()
             self.hdf5File = None
 
@@ -192,20 +234,40 @@ class DataFileHandler():
             index = 0
 
             # Looping through sensors
-            print(self.DelsysFileStructure)
             for sensor in list(self.DelsysFileStructure.keys()):
                 if ("Sensor" in sensor):
                     for channel in self.DelsysFileStructure[sensor]['Channels']:
                         try:
+                            """
+                            # Adding a starting time stamp
+                            if (channel == 'StartTime' and len(self.hdf5File[f'{sensor}/{channel}']) == 0):
+                                timeData = self.hdf5File[f'{sensor}/{channel}']
+                                currentTime = datetime.now()
+                                currentSize = timeData.shape[0]
+
+                                timeData.resize(currentSize + 1, axis = 0)
+                                print(list([currentTime.isoformat()]))
+                                # Data is saved as a float which can be converted to a datetime after using datetime.fromtimestamp()
+                                timeData[0:1] = list([currentTime.timestamp()])
+                            
+                            elif (channel == 'StartTime' and len(self.hdf5File[f'{sensor}/{channel}']) != 0):
+                                continue   
+
+                            elif (channel == 'EndTime'):
+                                continue 
+                            
+                            # Saving EMG and GYRO data
+                            else:
+                            """                               
                             # Adding data to sensor channel
                             dataset = self.hdf5File[f'{sensor}/{channel}']
                             
                             # Getting current size and reindexing
                             current_size = dataset.shape[0]
-                            dataset.resize(current_size + len(data[index]), axis = 0)
+                            dataset.resize(current_size + len(data[0][index]), axis = 0)
                             
                             # Setting new data
-                            dataset[current_size:current_size + len(data[index])] = data[index]
+                            dataset[current_size:current_size + len(data[0][index])] = list(data[0][index])
 
                         except Exception as e:
                             print(e)
@@ -215,8 +277,9 @@ class DataFileHandler():
                         index += 1
 
     def saveXSensorData(self, data):
+        #print("Trying to save data")
         # Saving XSensor Data, since data structure is similar, but different
-        if len(data == 0):
+        if len(data) == 0:
             pass
         else:
             # Indexing param
@@ -226,7 +289,14 @@ class DataFileHandler():
             for sensor in list(self.XSensorFileStructure.keys()):
                 for channel in self.XSensorFileStructure[sensor]['Channels']:
                     try:
-                        pass
+                        dataset = self.hdf5File[f'{sensor}/{channel}']
+                        # Getting current data from xsensor, saving full array for now
+                        current_size = dataset.shape[0]
+                        dataset.resize(current_size + len(data[index]), axis = 0)
+
+                        # Setting new data
+                        dataset[current_size:current_size + len(data[index])] = data[index]
+
                     except Exception as e:
                         print(e)
                         print(f"Unable to add data to {sensor} : {channel}")

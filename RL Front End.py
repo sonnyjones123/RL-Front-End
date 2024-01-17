@@ -3,7 +3,7 @@ This is the main Reinforcement Learning GUI that incorperates the DelsyEMG contr
 and XSensor Control Class. This GUI is used to control each data acqusition device and create a pipeline for saving data in real time.
 
 Written by Sonny Jones & Grange Simpson
-Version: 2023.11.10
+Version: 2024.01.17
 
 Usage: Run the file.
 
@@ -16,8 +16,6 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from functools import partial
-import threading
-import csv
 from datetime import date
 
 from RLDependencies.EMGPlot import *
@@ -26,25 +24,13 @@ from RLDependencies.OpenCVWidget import *
 from RLDependencies.XSensorWidget import *
 from RLDependencies.DataFileHandler import *
 
-class DataCollector(threading.Thread):
-    def __init__(self):
-        super().__init__()
-        self.data = []
-        self.running = True
-
-    def stop(self):
-        self.running = False
-
-    def save_to_csv(self, data, filename):
-        with open(filename, 'a', newline='\n') as csvfile:
-            writer = csv.writer(csvfile)
-            #writer.writerow(['Collected Data'])
-            for value in data:
-                writer.writerow([value])
-
 class MyWidget(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
+
+        # Data Saving Location
+        self.DataFileHandler = None
+        self.saveLocation = "C:/Users/Purkinje/Box/NeuroRoboticsLab/NERVES Lab/Project Groups/ML Gait/Experimental Data/"
 
         # Recording Params
         self.recording = False
@@ -60,6 +46,10 @@ class MyWidget(QMainWindow):
         layout = QHBoxLayout()
         self.splitter = QSplitter(self)
         collectionLayout = QVBoxLayout()
+
+        # Component Control
+        self.componentControl = self.componentController()
+        layout.addWidget(self.componentControl)
 
         # Delsys EMG
         self.DelsysEMG = DelsysEMG() 
@@ -100,9 +90,41 @@ class MyWidget(QMainWindow):
         # Creating LSLSender Object
         self.DelsysLSLSender = 0
 
-        # Data Saving Location
-        self.DataFileHandler = None
-        self.saveLocation = "C:/Users/Purkinje/Box/NeuroRoboticsLab/NERVES Lab/Project Groups/ML Gait/Experimental Data/"
+    #-----------------------------------------------------------------------------------
+    # ---- Controller for Components
+    def componentController(self):
+
+        # Creating Dictionary for Tracking Connected Components
+        self.componentTracker = {}
+
+        # Creating Label for Components
+        controllerPanel = QWidget()
+        controllerLayout = QVBoxLayout()
+        controllerLayout.setAlignment(Qt.AlignTop)
+
+        # Components Label
+        self.componentsLabel = QLabel("<b>Components</b>", alignment = Qt.AlignCenter)
+        self.componentsLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
+        controllerLayout.addWidget(self.componentsLabel)
+
+        # Delsys CheckBox
+        self.delsysCheckBox = QCheckBox("Delsys (EMG, EKG)")
+        self.delsysCheckBox.setStyleSheet('QCheckBox {color: black;}')
+        self.delsysCheckBox.setChecked(False)
+        self.delsysCheckBox.stateChanged.connect(self.delsysCheckedCallback)
+        controllerLayout.addWidget(self.delsysCheckBox)
+        
+        # XSensor CheckBox
+        self.XSensorCheckBox = QCheckBox("XSensor")
+        self.XSensorCheckBox.setStyleSheet('QCheckBox {color: black;}')
+        self.XSensorCheckBox.setChecked(False)
+        self.XSensorCheckBox.stateChanged.connect(self.XSensorCheckedCallback)
+        controllerLayout.addWidget(self.XSensorCheckBox)
+
+        # Adding to Panel
+        controllerPanel.setLayout(controllerLayout)
+
+        return controllerPanel
 
     #-----------------------------------------------------------------------------------
     # ---- Delsys Control Widget
@@ -200,16 +222,7 @@ class MyWidget(QMainWindow):
         self.stopDataCollectionButton.setStyleSheet('color: grey;')
         self.stopDataCollectionButton.setEnabled(False)
         dataCollectionButtonLayout.addWidget(self.stopDataCollectionButton)
-
-        # Save Collected Data Button
-        self.saveCollectedDataButton = QPushButton("Save Trial Data", self)
-        self.saveCollectedDataButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.saveCollectedDataButton.objectName = 'Save Collection'
-        self.saveCollectedDataButton.clicked.connect(self.saveDataCollectionCallback)
-        self.saveCollectedDataButton.setStyleSheet('color: grey;')
-        self.saveCollectedDataButton.setEnabled(False)
-        dataCollectionButtonLayout.addWidget(self.saveCollectedDataButton)
-
+        
         # Adding to Complete Layout
         delsysButtonLayout.addLayout(dataCollectionButtonLayout)
         
@@ -228,7 +241,8 @@ class MyWidget(QMainWindow):
         self.connectButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.connectButton.objectName = 'Connect'
         self.connectButton.clicked.connect(self.connectCallback)
-        self.connectButton.setStyleSheet('QPushButton {color: black;}')
+        self.connectButton.setEnabled(False)
+        self.connectButton.setStyleSheet('QPushButton {color: grey;}')
         delsysButtonLayout.addWidget(self.connectButton)
 
         # Creating Next Layout
@@ -383,23 +397,35 @@ class MyWidget(QMainWindow):
         # Data Processing Pipeline
         if self.recording:
             try:
-                # Delsys Data Polling and Update
-                self.DelsysEMG.processData()
+                if 'Delsys' in self.componentTracker:
+                    # Delsys Data Polling and Update
+                    self.DelsysEMG.processData()
 
-                # Saving data to hdf5 file
-                #self.DelsysEMG.data
-                # Buffer is cleared in plotEMGGUI
-                averageEMG = self.DelsysEMG.plotEMGGUI()                
+                    # Saving data to hdf5 file
+                    self.DataFileHandler.saveDelsysData(self.DelsysEMG.data)
 
-                self.EMGPlot.plotEMG(averageEMG)
+                    # Buffer is cleared in plotEMGGUI
+                    averageEMG = self.DelsysEMG.plotEMGGUI()                
 
-                # XSensor Polling and Update
-                if self.xSensorTimer >= self.xSensorWidget.frameDelay:
-                    self.xSensorWidget.processDataCallback()
-                    self.xSensorTimer = 0
-                else:
-                    self.xSensorTimer += self.recordingRate
+                    self.EMGPlot.plotEMG(averageEMG)
+            except:
+                pass
+            
+            try:
+                if 'XSensor' in self.componentTracker:
+                    # XSensor Polling and Update
+                    if self.xSensorTimer >= self.xSensorWidget.frameDelay:
+                        self.xSensorWidget.processDataCallback()
+                        # Saving data to hdf5 file
+                        self.DataFileHandler.saveXSensorData(self.xSensorWidget.XSensorForce.dataBuffer)
+                        #for sensor in range(self.xSensorWidget.numSensors):
+                        #    self.xSensorWidget.XSensorForce.dataBuffer[sensor]
+                            
+                        self.xSensorTimer = 0
+                    else:
+                        self.xSensorTimer += self.recordingRate
             except Exception as e:
+                print("Issue processing the data")
                 print(e)
         
         # Video Processing
@@ -436,7 +462,8 @@ class MyWidget(QMainWindow):
         self.xSensorWidget.releaseAndQuit()
         
         # Closing Data File
-        self.DataFileHandler.closeFile()
+        if self.DataFileHandler is not None:
+            self.DataFileHandler.closeFile()
         
         # Releasing Camera and Audio
         self.videoCapture.releaseConfig()
@@ -581,6 +608,7 @@ class MyWidget(QMainWindow):
         
         # Updating ready status
         self.ready = True
+        self.componentTracker['Delsys'] = True
 
         # Adding Sensor Plots
         if self.EMGPlot is None:
@@ -592,7 +620,13 @@ class MyWidget(QMainWindow):
     def configureDataFileCallback(self):
         print("Configuring Save File...")
 
-        if self.ready and self.xSensorWidget.ready:
+        # Checking XSensor Status
+        if 'XSensor' in self.componentTracker.keys():
+            if self.xSensorWidget.ready:
+                self.componentTracker['XSensor'] = True
+
+        # Checking If All Components Are Ready
+        if all(list(self.componentTracker.values())):
             try:
                 # Creating file
                 if self.DataFileHandler is None:
@@ -622,11 +656,32 @@ class MyWidget(QMainWindow):
                 self.startDataCollectionButton.setEnabled(True)
                 self.startDataCollectionButton.setStyleSheet('QPushButton {color: black;}')
 
-                print("Successfully Configured File")
+                print("Successfully Configured Data File")
 
             except Exception as e:
                 print(e)
-                print("Unable to configure file")
+                print("Unable to Configure Data File")
+
+            try:
+                # If save path not in class
+                if self.videoCapture.filePath is None:
+                    # Getting Experiment Name
+                    self.experimentName = self.experimentNameEntry.text()
+
+                    # Creating file save location path
+                    savePath = os.path.join(self.saveLocation, self.experimentName)
+
+                    # Adding Path
+                    self.videoCapture.filePath = savePath
+
+                # Creating Video Outlet
+                self.videoCapture.createOutlet(self.trialEntry.currentText())
+
+                print("Successfully Configured Video Outlet")
+
+            except Exception as e:
+                print(e)
+                print("Unable to Configure Video Outlet")
 
         else:
             print('Delsys and XSensor Not Ready')
@@ -659,6 +714,15 @@ class MyWidget(QMainWindow):
             print(e)
             print("Unable to Close File")
 
+        
+        try:
+            # Closing Video Outlet
+            self.videoCapture.releaseOutlet()
+
+        except Exception as e:
+            print(e)
+            print("Unable to Close Video Outlet")
+
     # Start Data Collection Callback
     def startDataCollectionCallback(self):
         # Start Data Collection on All Platforms
@@ -667,6 +731,9 @@ class MyWidget(QMainWindow):
         self.recording = True
         self.videoCapture.recording = True
 
+        # Adding start time to file
+        self.DataFileHandler.addStartTime(datetime.now().timestamp())
+
         # Updating GUI
         # Stop Data Collection Button
         self.stopDataCollectionButton.setEnabled(True)
@@ -674,10 +741,6 @@ class MyWidget(QMainWindow):
 
         # Delsys Status
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
-
-        # Save Data Button
-        self.saveCollectedDataButton.setEnabled(False)
-        self.saveCollectedDataButton.setStyleSheet("QPushButton {color: grey;}")
 
         # Close Data File Button
         self.closeDataFileButton.setEnabled(False)
@@ -692,14 +755,14 @@ class MyWidget(QMainWindow):
         self.DelsysEMG.stopDataCollection()
         self.videoCapture.recording = False
         self.recording = False
+
+        # Adding stop time to file
+        self.DataFileHandler.addStopTime(datetime.now().timestamp())
+        
         self.xSensorWidget.stopDataCollection()
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
         
         # Updating GUI
-        # Save Colleciont Data Button
-        self.saveCollectedDataButton.setEnabled(True)
-        self.saveCollectedDataButton.setStyleSheet("QPushButton {color: black;}")
-
         # Close Data File Button
         self.closeDataFileButton.setEnabled(True)
         self.closeDataFileButton.setStyleSheet('QPushButton {color: black;}')
@@ -707,68 +770,47 @@ class MyWidget(QMainWindow):
         # Saving Elapsed Time
         self.timeElapsed = self.dataCollectionTimer.elapsed()
 
-    # Save data after a trial has been completed
-    def saveDataCollectionCallback(self):
-        print("called")
-        fileName = simpledialog.askstring(title = 'Trial File Name Input',
-                                                          prompt = 'Please provide a name for this trial (no file extension or date).')
-        #fileName = self.openDialog('Trial File Name Input', 'Please provide a name for this trial (no file extension or date).')
-        self.dataCollector = DataCollector()
-        self.dataCollector.start()
+    # Delsys Checked Callback
+    def delsysCheckedCallback(self):
+        # If CheckBox Moves to Checked State
+        if self.delsysCheckBox.isChecked():
+            self.componentTracker['Delsys'] = False
 
-        # Creating Timeseries
-        self.timeSeriesGeneration()
+            # Updating GUI
+            self.connectButton.setEnabled(True)
+            self.connectButton.setStyleSheet('QPushButton {color: black;}')
 
-        # Saving to a file
-        if self.dataCollector:
-            today = date.today()
-            self.dataCollector.save_to_csv(self.DelsysEMG.returnAllData(), str(fileName) + '_' + str(today) +'.csv')
+        # If CheckBox Moves to Unchecked State
+        else:
+            # Deleting Key From Component Tracker Dictionary
+            self.componentTracker.pop('Delsys')
 
-        if self.dataCollector is not None:
-            self.dataCollector.stop()
-            self.dataCollector.join()
-            self.dataCollector = None
+            # Updating GUI
+            self.connectButton.setEnabled(False)
+            self.connectButton.setStyleSheet('QPushButton {color: grey;}')
 
-    #-----------------------------------------------------------------------------------
-    # ---- Data Saving Functions for Saving Data Continuously       
-    def createDataObject(self):
-        """
-        Creates and initializes data saving object that will be used to manage all data saving.
-        """
-        # Creating data saving object
-        self.DataFileHandler = DataFileHandler("TestingLiveDataSaving")
+        print(self.componentTracker)  
 
-        # Looping through channel names
-        for key, value in self.DelsysEMG.dataSavingSensorDict.items():
-            for channel in value['channelNames']:
-                pass
+    # XSensor Checked Callback
+    def XSensorCheckedCallback(self):
+        # If CheckBox Moves to Checked State
+        if self.XSensorCheckBox.isChecked():
+            self.componentTracker['XSensor'] = False
 
-    def timeSeriesGeneration(self):
-        """
-        Generating Time Series For Export
-        """
-        # Creating array to track channel generation
-        self.timeSeriesTracker = []
+            # Updating GUI
+            self.xSensorWidget.configureButton.setEnabled(True)
+            self.xSensorWidget.configureButton.setStyleSheet('QPushButton {color: black;}')
 
-        # Delsys Time Series Generation
-        # Looping through Channel Names
-        for index, channel in enumerate(self.DelsysEMG.channelNames):
-            chanName = str.split(channel, " ")[0]
-            if chanName not in self.timeSeriesTracker:
-                self.timeSeriesTracker.append(chanName)
-                if chanName == "EMG":
-                    self.EMGTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
-                if chanName == "GYRO":
-                    self.GYROTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
-                if chanName == "EKG":
-                    self.ECGTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
-                if chanName == "IMP":
-                    self.IMPTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
-                if chanName == "Analog":
-                    self.AnalogTimeSeries = np.arange(0, self.timeElapsed, len(self.DelsysEMG.DataHandler.allcollectiondata[index]))
+        # If CheckBox Moves to Unchecked State
+        else:
+            # Deleting Key From Component Tracker Dictionary
+            self.componentTracker.pop('XSensor')
 
-        # XSensor Time Series Generation
-        self.XSensorTimeSeries = np.arange(0, self.timeElapsed, len(self.xSensorWidget.XSensorForce.allCollectionDataBuffer))
+            # Updating GUI
+            self.xSensorWidget.configureButton.setEnabled(False)
+            self.xSensorWidget.configureButton.setStyleSheet('QPushButton {color: grey;}')
+
+        print(self.componentTracker)  
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -103,8 +103,8 @@ class XSensorForce:
         self.connected = False
 
         # Data Saving File Structure
-        self.dataSavingSensorDict = {}
-        self.tempChanList = ['Pressure']
+        self.dataSavingSensorDict = None
+        self.tempChanList = ['Pressure', 'StartTime', 'EndTime']
 
         # query the DLL version (for XSENSOR support reference)
         self.xscore.XS_GetVersion(ctypes.byref(self.wMajor), ctypes.byref(self.wMinor), ctypes.byref(self.wRevision), ctypes.byref(self.wBuild))
@@ -153,6 +153,9 @@ class XSensorForce:
             self.xscore.XS_SetAcquisitionCycles(1)
 
     def configure(self):
+        # Creating Saving Dictionary 
+        self.dataSavingSensorDict = {}
+
         # Ask the DLL to scan the computer for attached sensors.
         self.xscore.XS_EnumSensors()
         self.numSensors = self.xscore.XS_EnumSensorCount()
@@ -294,7 +297,7 @@ class XSensorForce:
         """
         Stop data collection.
         """
-        self.connected = False
+        #self.connected = False
 
     def releaseConfig(self):
         """
