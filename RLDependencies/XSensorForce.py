@@ -104,7 +104,7 @@ class XSensorForce:
 
         # Data Saving File Structure
         self.dataSavingSensorDict = None
-        self.tempChanList = ['Pressure', 'StartTime', 'EndTime']
+        self.tempChanList = ['Pressure']
 
         # query the DLL version (for XSENSOR support reference)
         self.xscore.XS_GetVersion(ctypes.byref(self.wMajor), ctypes.byref(self.wMinor), ctypes.byref(self.wRevision), ctypes.byref(self.wBuild))
@@ -298,6 +298,9 @@ class XSensorForce:
         Stop data collection.
         """
         #self.connected = False
+
+        # Resetting Buffer
+        self.dataBuffer = []
 
     def releaseConfig(self):
         """

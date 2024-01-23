@@ -71,10 +71,11 @@ class DelsysEMG:
         self.LSLReceiver = 0
 
         # Sample Mode List
-        self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz', 
+        self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz',
+                               'EMG plus IMU (+/-16, +/- 2000dps)', 
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-5.5mV, 2-30Hz',
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz',
-                               'SIG raw x4 (519Hz) (x1813)']
+                               'SIG raw x2 (519Hz)']
         
         # Data Saving File Structure
         self.dataSavingSensorDict = None
@@ -141,7 +142,7 @@ class DelsysEMG:
             while self.TrigBase.CheckPairStatus():
                 continue
             
-# Need to check why adding 1 sensors on accident multiple times causes errors 
+            # [TODO] Need to check why adding 1 sensors on accident multiple times causes errors 
 
             # Adding sensorNames and sensorNum to dict
             for sensorName in self.TrigBase.GetSensorNames():
@@ -154,14 +155,13 @@ class DelsysEMG:
                     # Asking user for input
                     # sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
                     sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                                                          prompt = 'Please indicate where this sensor is on.', parent=self.ROOT)
+                                                          prompt = 'Please indicate what muscle this sensor will be on.', parent=self.ROOT)
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
             tempSensorKey = list(self.sensorDict.keys())
             print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
 
-        # Scanning for Paired Sensors
-        print("Scanning for paired sensors...")
+        # Required otherwise pipeline state doesn't update
         self.TrigBase.ScanSensors()
 
         # Getting Number of Sensors
@@ -174,6 +174,53 @@ class DelsysEMG:
 
         # Updating Pipeline State
         self.status = self.TrigBase.GetPipelineState()
+
+    def scanForSensors(self):
+        # Scanning for Paired Sensors
+        print("Scanning for paired sensors...")
+        """Callback to tell the base to scan for any available sensors"""
+        try:
+            f = self.TrigBase.ScanSensors().Result
+        except Exception as e:
+            print("Scan failed")
+            #time.sleep(1)
+            self.scanForSensors()
+
+        # Getting an array of the found sensors
+        scanIterator = 0
+        # Iterating along backwards since sensors get scanned in reverse from the original order they were added
+        sensorList = list(self.TrigBase.GetSensorNames())
+        sensorList = sensorList[::-1]
+        for sensorName in sensorList:
+            tempSensorName = sensorName.split(" ")[0]
+            if int(tempSensorName) in self.sensorDict.keys():
+                continue
+            else:
+                self.sensorDict[int(tempSensorName)] = [scanIterator]
+
+                # Asking user for input
+                sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
+                                                        prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
+                self.sensorDict[int(tempSensorName)].append(sensorMuscle)
+
+                scanIterator += 1
+
+
+        # Array of sensorNames, and their index
+        self.sensorNames
+        # Getting Number of Sensors
+        self.sensorsFound = len(self.sensorDict.keys())
+        
+        print("------Sensor List-----")
+        # Printing Num of Sensors and Sensor List
+        print(f"Sensors Found: {self.sensorsFound}")
+        [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
+
+        # Updating Pipeline State
+        self.status = self.TrigBase.GetPipelineState()        
+
+    def pairSensors(self, numSensors):
+        self.connectSensors(numSensors)
 
     def selectAllSensors(self):
         """
@@ -348,9 +395,6 @@ class DelsysEMG:
                         if 'EMG' in selectedSensor.TrignoChannels[channel].Name:
                             self.numEMGChannels += 1    
                             self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])  
-                    
-                    tempChanNameList.append('StartTime')
-                    tempChanNameList.append('EndTime')
 
                 # Adding to DataSavingSensorDict
                 self.dataSavingSensorDict[tempSensorName] = {'Channels': tempChanNameList,
@@ -399,8 +443,8 @@ class DelsysEMG:
         """
         outArr = self.getData()
         if outArr is not None:
-            for i in range(len(outArr)):
-                self.DataHandler.allcollectiondata[i].extend(outArr[i][0].tolist())
+            #for i in range(len(outArr)):
+            #    self.DataHandler.allcollectiondata[i].extend(outArr[i][0].tolist())
             try:
                 for i in range(len(outArr[0])):
                     if np.asarray(outArr[0]).ndim == 1:

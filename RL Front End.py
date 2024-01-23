@@ -10,7 +10,6 @@ Usage: Run the file.
 """
 
 import os
-import subprocess
 import sys
 from PySide6.QtCore import *
 from PySide6.QtGui import *
@@ -45,11 +44,18 @@ class MyWidget(QMainWindow):
         # Creating SubWidgets
         layout = QHBoxLayout()
         self.splitter = QSplitter(self)
+        #self.splitter2 = QSplitter(self)
         collectionLayout = QVBoxLayout()
 
         # Component Control
         self.componentControl = self.componentController()
         layout.addWidget(self.componentControl)
+        #self.splitter2.addWidget(self.componentControl)
+
+        # Note taking
+        self.noteTaking = self.noteTaker()
+        # layout.addWidget(self.noteTaking)
+        #self.splitter2.addWidget(self.noteTaking)
 
         # Delsys EMG
         self.DelsysEMG = DelsysEMG() 
@@ -87,9 +93,6 @@ class MyWidget(QMainWindow):
         # Data Collection Ready
         self.ready = False
 
-        # Creating LSLSender Object
-        self.DelsysLSLSender = 0
-
     #-----------------------------------------------------------------------------------
     # ---- Controller for Components
     def componentController(self):
@@ -125,6 +128,33 @@ class MyWidget(QMainWindow):
         controllerPanel.setLayout(controllerLayout)
 
         return controllerPanel
+
+    #-----------------------------------------------------------------------------------
+    # ---- Widget for Taking Notes
+    def noteTaker(self):
+        
+        # Creating Label for Note taking Components
+        noteTakerPanel = QWidget()
+        noteTakerLayout = QVBoxLayout()
+        noteTakerLayout.setAlignment(Qt.AlignLeft)
+        
+        # Note taking label
+        self.noteTakingLabel = QLabel("<b>Note Taking</b>", alignment = Qt.AlignLeft)
+        self.noteTakingLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
+        noteTakerLayout.addWidget(self.noteTakingLabel)
+
+        # Note taking screen
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setStyleSheet('{color: white;}')
+        noteTakerLayout.addWidget(self.text_edit)
+        
+        # Add in saving button
+
+        noteTakerPanel.setLayout(noteTakerLayout)
+
+        return noteTakerPanel
+
+
 
     #-----------------------------------------------------------------------------------
     # ---- Delsys Control Widget
@@ -303,7 +333,7 @@ class MyWidget(QMainWindow):
         delsysButtonLayout.addLayout(sensorGrid)
 
         # Displaying Selected Sensors
-        self.sensorSelectedDisplay = QLabel("Sensors Selected: " + str(self.sensorsSelected))
+        self.sensorSelectedDisplay = QLabel("Sensors Selected: " + str([sensor + 1 for sensor in self.sensorsSelected]))
         self.sensorSelectedDisplay.setStyleSheet('QLabel {color: black;}')
         delsysButtonLayout.addWidget(self.sensorSelectedDisplay)
 
@@ -408,24 +438,27 @@ class MyWidget(QMainWindow):
                     averageEMG = self.DelsysEMG.plotEMGGUI()                
 
                     self.EMGPlot.plotEMG(averageEMG)
-            except:
-                pass
+            except Exception as e:
+                print("Issue processing Delsys Data")
+                print(e)
             
             try:
                 if 'XSensor' in self.componentTracker:
                     # XSensor Polling and Update
                     if self.xSensorTimer >= self.xSensorWidget.frameDelay:
+                        # Processing Data and Updating Display
                         self.xSensorWidget.processDataCallback()
+
                         # Saving data to hdf5 file
                         self.DataFileHandler.saveXSensorData(self.xSensorWidget.XSensorForce.dataBuffer)
-                        #for sensor in range(self.xSensorWidget.numSensors):
-                        #    self.xSensorWidget.XSensorForce.dataBuffer[sensor]
-                            
+
+                        # Resetting Timer    
                         self.xSensorTimer = 0
                     else:
+                        # Increasing Timer by Recording Rate
                         self.xSensorTimer += self.recordingRate
             except Exception as e:
-                print("Issue processing the data")
+                print("Issue processing XSensor Data")
                 print(e)
         
         # Video Processing
@@ -449,7 +482,7 @@ class MyWidget(QMainWindow):
             self.sensorsSelected.append(int(value))
 
         # Updating Sensor List
-        self.sensorSelectedDisplay.setText("Sensors Selected: " + str(self.sensorsSelected))
+        self.sensorSelectedDisplay.setText("Sensors Selected: " + str([sensor + 1 for sensor in self.sensorsSelected]))
 
     # Exit function
     def closeEvent(self, event):
@@ -498,7 +531,8 @@ class MyWidget(QMainWindow):
     # Delsys Pair Sensor Callback
     def pairSensorCallback(self):
         # Pairing Sensors
-        self.DelsysEMG.connectSensors(self.sensorNumber.text())
+        #self.DelsysEMG.connectSensors(self.sensorNumber.text())
+        self.DelsysEMG.pairSensors(self.sensorNumber.text())
 
         # Updating GUI
         # Delsys Status
@@ -519,7 +553,8 @@ class MyWidget(QMainWindow):
     # Delsys Scan Sensor Callback
     def scanSensorCallback(self):
         # Scan for Connected Sensors
-        self.DelsysEMG.connectSensors(0)
+        #self.DelsysEMG.connectSensors(0)
+        self.DelsysEMG.scanForSensors()
 
         # Updating GUI
         # Delsys Status

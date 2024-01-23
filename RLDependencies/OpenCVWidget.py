@@ -61,7 +61,7 @@ class VideoWidget(QWidget):
         self.format = pyaudio.paInt16
         self.channels = 2
         self.rate = 44100
-        self.framesPerBuffer = 1024
+        self.framesPerBuffer = 1336
 
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format = self.format, channels = self.channels, rate = self.rate, input = True, frames_per_buffer = self.framesPerBuffer)
@@ -177,7 +177,7 @@ class VideoWidget(QWidget):
     # Saving AUdio
     def saveAudio(self):
         if self.recording:
-            audioData = self.stream.read(1024)
+            audioData = self.stream.read(1336)
             self.audioWriter.writeframes(audioData)
             
     # Releasing Outlet

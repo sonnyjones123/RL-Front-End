@@ -97,12 +97,6 @@ class DataFileHandler():
                 for i in range(len(datasets['Channels'])):
                     print(datasets['Channels'][i])
                     # Creating channels and adding sample rates for EMG GYROX, GYROY, GYROZ
-                    """
-                    if (i < 4):
-                        self.createChannel(group, datasets['Channels'][i], {'SampleRate' : datasets['SampleRates'][i]})
-                    else:
-                        self.createChannel(group, datasets['Channels'][i])
-                    """
                     self.createChannel(group, datasets['Channels'][i], {'SampleRate' : datasets['SampleRates'][i]})
 
             except Exception as e:
@@ -197,31 +191,7 @@ class DataFileHandler():
     def closeFile(self):
         # Checking to see if file exists
         if self.hdf5File is not None:
-            # closing file
-            """
-            for sensor in list(self.DelsysFileStructure.keys()):
-                if ("Sensor" in sensor):
-                    for channel in self.DelsysFileStructure[sensor]['Channels']:
-                        try:
-                            # Adding a starting time stamp
-                            if (channel == 'EndTime'):
-                                timeData = self.hdf5File[f'{sensor}/{channel}']
-                                currentTime = datetime.now()
-                                currentSize = timeData.shape[0]
-
-                                timeData.resize(currentSize + 1, axis = 0)
-                                print(list([currentTime.isoformat()]))
-                                # Data is saved as a float which can be converted to a datetime after using datetime.fromtimestamp()
-                                timeData[0:1] = list([currentTime.timestamp()])
-
-                            else:                               
-                                continue
-
-                        except Exception as e:
-                            print(e)
-                            print(f"Unable to add data to {sensor} : {channel}")
-            """
-
+            # Closing file
             self.hdf5File.close()
             self.hdf5File = None
 
@@ -237,28 +207,7 @@ class DataFileHandler():
             for sensor in list(self.DelsysFileStructure.keys()):
                 if ("Sensor" in sensor):
                     for channel in self.DelsysFileStructure[sensor]['Channels']:
-                        try:
-                            """
-                            # Adding a starting time stamp
-                            if (channel == 'StartTime' and len(self.hdf5File[f'{sensor}/{channel}']) == 0):
-                                timeData = self.hdf5File[f'{sensor}/{channel}']
-                                currentTime = datetime.now()
-                                currentSize = timeData.shape[0]
-
-                                timeData.resize(currentSize + 1, axis = 0)
-                                print(list([currentTime.isoformat()]))
-                                # Data is saved as a float which can be converted to a datetime after using datetime.fromtimestamp()
-                                timeData[0:1] = list([currentTime.timestamp()])
-                            
-                            elif (channel == 'StartTime' and len(self.hdf5File[f'{sensor}/{channel}']) != 0):
-                                continue   
-
-                            elif (channel == 'EndTime'):
-                                continue 
-                            
-                            # Saving EMG and GYRO data
-                            else:
-                            """                               
+                        try:                  
                             # Adding data to sensor channel
                             dataset = self.hdf5File[f'{sensor}/{channel}']
                             
@@ -277,7 +226,6 @@ class DataFileHandler():
                         index += 1
 
     def saveXSensorData(self, data):
-        #print("Trying to save data")
         # Saving XSensor Data, since data structure is similar, but different
         if len(data) == 0:
             pass
