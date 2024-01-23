@@ -44,18 +44,11 @@ class MyWidget(QMainWindow):
         # Creating SubWidgets
         layout = QHBoxLayout()
         self.splitter = QSplitter(self)
-        #self.splitter2 = QSplitter(self)
         collectionLayout = QVBoxLayout()
 
         # Component Control
         self.componentControl = self.componentController()
         layout.addWidget(self.componentControl)
-        #self.splitter2.addWidget(self.componentControl)
-
-        # Note taking
-        self.noteTaking = self.noteTaker()
-        # layout.addWidget(self.noteTaking)
-        #self.splitter2.addWidget(self.noteTaking)
 
         # Delsys EMG
         self.DelsysEMG = DelsysEMG() 
@@ -124,7 +117,13 @@ class MyWidget(QMainWindow):
         self.XSensorCheckBox.stateChanged.connect(self.XSensorCheckedCallback)
         controllerLayout.addWidget(self.XSensorCheckBox)
 
+        # Note taking
+        self.noteTaking = self.noteTaker()
+        controllerLayout.addWidget(self.noteTaking)
+
         # Adding to Panel
+        controllerPanel.setMaximumSize(200, 500)
+        controllerPanel.setMinimumSize(180, 300)
         controllerPanel.setLayout(controllerLayout)
 
         return controllerPanel
@@ -145,7 +144,9 @@ class MyWidget(QMainWindow):
 
         # Note taking screen
         self.text_edit = QTextEdit(self)
-        self.text_edit.setStyleSheet('{color: white;}')
+        self.text_edit.setMaximumSize(200, 500)
+        self.text_edit.setMinimumSize(180, 100)
+        self.text_edit.setStyleSheet("background-color: DarkOrange;")
         noteTakerLayout.addWidget(self.text_edit)
         
         # Add in saving button

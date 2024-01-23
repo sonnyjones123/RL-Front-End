@@ -153,12 +153,12 @@ class DelsysEMG:
                     self.sensorDict[int(tempSensorName)] = [num]
 
                     # Asking user for input
-                    # sensorMuscle = input("RESPONSE REQUESTED: Please indicate which muscle this sensor is on.\n")
                     sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
                                                           prompt = 'Please indicate what muscle this sensor will be on.', parent=self.ROOT)
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
             tempSensorKey = list(self.sensorDict.keys())
+
             print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
 
         # Required otherwise pipeline state doesn't update
