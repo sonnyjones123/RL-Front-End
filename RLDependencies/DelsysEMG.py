@@ -72,10 +72,9 @@ class DelsysEMG:
 
         # Sample Mode List
         self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz',
-                               'EMG plus IMU (+/-16, +/- 2000dps)', 
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-5.5mV, 2-30Hz',
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz',
-                               'SIG raw x2 (519Hz)']
+                               'SIG raw x4 (519Hz) (x1813)']
         
         # Data Saving File Structure
         self.dataSavingSensorDict = None
@@ -186,25 +185,19 @@ class DelsysEMG:
             #time.sleep(1)
             self.scanForSensors()
 
-        # Getting an array of the found sensors
-        scanIterator = 0
         # Iterating along backwards since sensors get scanned in reverse from the original order they were added
         sensorList = list(self.TrigBase.GetSensorNames())
-        sensorList = sensorList[::-1]
-        for sensorName in sensorList:
+        for index, sensorName in enumerate(sensorList):
             tempSensorName = sensorName.split(" ")[0]
             if int(tempSensorName) in self.sensorDict.keys():
                 continue
             else:
-                self.sensorDict[int(tempSensorName)] = [scanIterator]
+                self.sensorDict[int(tempSensorName)] = [index]
 
                 # Asking user for input
                 sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
                                                         prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
                 self.sensorDict[int(tempSensorName)].append(sensorMuscle)
-
-                scanIterator += 1
-
 
         # Array of sensorNames, and their index
         self.sensorNames
@@ -366,13 +359,11 @@ class DelsysEMG:
             self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
             self.dataSavingSensorDict = {}
 
-            # Sensor Names
-            sensorNames = self.TrigBase.GetSensorNames()
-
             # Looping through sensor list
             for sensorNum in range(self.sensorsFound):
-                # Creating temp sensor name
-                tempSensorName = f"Sensor {sensorNum}"
+                # Creating temp sensor name                
+                tempSensorName = f"Sensor {self.sensorNames.index(list(self.sensorDict.keys())[sensorNum]) + 1}"
+
                 # Selecting sensor object
                 selectedSensor = self.TrigBase.GetSensorObject(sensorNum)
                 # Checking to see if sensor channels are greated than 0.

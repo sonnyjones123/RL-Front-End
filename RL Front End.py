@@ -22,6 +22,7 @@ from RLDependencies.DelsysEMG import *
 from RLDependencies.OpenCVWidget import *
 from RLDependencies.XSensorWidget import *
 from RLDependencies.DataFileHandler import *
+from RLDependencies.NoteTakingWidget import *
 
 class MyWidget(QMainWindow):
     def __init__(self):
@@ -44,11 +45,18 @@ class MyWidget(QMainWindow):
         # Creating SubWidgets
         layout = QHBoxLayout()
         self.splitter = QSplitter(self)
+        self.splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         collectionLayout = QVBoxLayout()
 
         # Component Control
+        controlAndNotes = QVBoxLayout()
         self.componentControl = self.componentController()
-        layout.addWidget(self.componentControl)
+        controlAndNotes.addWidget(self.componentControl)
+
+        # Note Taker
+        self.noteTaker = NoteTakerWidget(self.saveLocation)
+        controlAndNotes.addWidget(self.noteTaker)
+        layout.addLayout(controlAndNotes)
 
         # Delsys EMG
         self.DelsysEMG = DelsysEMG() 
@@ -95,6 +103,8 @@ class MyWidget(QMainWindow):
 
         # Creating Label for Components
         controllerPanel = QWidget()
+        controllerPanel.setFixedSize(300, 100)
+        
         controllerLayout = QVBoxLayout()
         controllerLayout.setAlignment(Qt.AlignTop)
 
@@ -117,45 +127,11 @@ class MyWidget(QMainWindow):
         self.XSensorCheckBox.stateChanged.connect(self.XSensorCheckedCallback)
         controllerLayout.addWidget(self.XSensorCheckBox)
 
-        # Note taking
-        self.noteTaking = self.noteTaker()
-        controllerLayout.addWidget(self.noteTaking)
-
         # Adding to Panel
-        controllerPanel.setMaximumSize(200, 500)
-        controllerPanel.setMinimumSize(180, 300)
         controllerPanel.setLayout(controllerLayout)
+        controllerPanel.setMaximumSize(300, 100)
 
         return controllerPanel
-
-    #-----------------------------------------------------------------------------------
-    # ---- Widget for Taking Notes
-    def noteTaker(self):
-        
-        # Creating Label for Note taking Components
-        noteTakerPanel = QWidget()
-        noteTakerLayout = QVBoxLayout()
-        noteTakerLayout.setAlignment(Qt.AlignLeft)
-        
-        # Note taking label
-        self.noteTakingLabel = QLabel("<b>Note Taking</b>", alignment = Qt.AlignLeft)
-        self.noteTakingLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
-        noteTakerLayout.addWidget(self.noteTakingLabel)
-
-        # Note taking screen
-        self.text_edit = QTextEdit(self)
-        self.text_edit.setMaximumSize(200, 500)
-        self.text_edit.setMinimumSize(180, 100)
-        self.text_edit.setStyleSheet("background-color: DarkOrange;")
-        noteTakerLayout.addWidget(self.text_edit)
-        
-        # Add in saving button
-
-        noteTakerPanel.setLayout(noteTakerLayout)
-
-        return noteTakerPanel
-
-
 
     #-----------------------------------------------------------------------------------
     # ---- Delsys Control Widget
@@ -502,6 +478,10 @@ class MyWidget(QMainWindow):
         # Releasing Camera and Audio
         self.videoCapture.releaseConfig()
 
+        # Closing Note Taking File
+        if self.noteTaker.file is not None:
+            self.noteTaker.closeTextFile()
+
         print("Clean Up Successful")
 
         # Default closeEvent Action
@@ -532,8 +512,7 @@ class MyWidget(QMainWindow):
     # Delsys Pair Sensor Callback
     def pairSensorCallback(self):
         # Pairing Sensors
-        #self.DelsysEMG.connectSensors(self.sensorNumber.text())
-        self.DelsysEMG.pairSensors(self.sensorNumber.text())
+        self.DelsysEMG.connectSensors(self.sensorNumber.text())
 
         # Updating GUI
         # Delsys Status
@@ -554,7 +533,6 @@ class MyWidget(QMainWindow):
     # Delsys Scan Sensor Callback
     def scanSensorCallback(self):
         # Scan for Connected Sensors
-        #self.DelsysEMG.connectSensors(0)
         self.DelsysEMG.scanForSensors()
 
         # Updating GUI
@@ -650,7 +628,9 @@ class MyWidget(QMainWindow):
         if self.EMGPlot is None:
             self.EMGPlot = EMGPlot(self.DelsysEMG.numEMGChannels, self.DelsysEMG.sensorDict, self.DelsysEMG.EMGSensors, self.recordingRate)
             self.splitter.insertWidget(1, self.EMGPlot.plotWidget)
-            widget.resize(1700, 400)
+            
+            self.splitter.setStretchFactor(1, 3)
+            self.splitter.update()
 
     # Configuring File for Data Saving
     def configureDataFileCallback(self):
@@ -721,6 +701,18 @@ class MyWidget(QMainWindow):
 
         else:
             print('Delsys and XSensor Not Ready')
+
+        try:
+            # Creating Note Taking File
+            self.noteTaker.createTextFile(self.experimentNameEntry.text())
+            self.noteTaker.addNoteButton.setEnabled(True)
+            self.noteTaker.addNoteButton.setStyleSheet('QPushButton {color: black;}')
+            
+            # Adding Trial Name to Note Taker Widget
+            self.noteTaker.addTrialName(self.trialEntry.currentText())
+        except Exception as e:
+            print(e)
+            print("Couldn't Initialize Note Taking File")
 
     # Manual Callback for Closing Data File
     def closeDataFileCallback(self):
@@ -825,8 +817,6 @@ class MyWidget(QMainWindow):
             self.connectButton.setEnabled(False)
             self.connectButton.setStyleSheet('QPushButton {color: grey;}')
 
-        print(self.componentTracker)  
-
     # XSensor Checked Callback
     def XSensorCheckedCallback(self):
         # If CheckBox Moves to Checked State
@@ -844,9 +834,7 @@ class MyWidget(QMainWindow):
 
             # Updating GUI
             self.xSensorWidget.configureButton.setEnabled(False)
-            self.xSensorWidget.configureButton.setStyleSheet('QPushButton {color: grey;}')
-
-        print(self.componentTracker)  
+            self.xSensorWidget.configureButton.setStyleSheet('QPushButton {color: grey;}') 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

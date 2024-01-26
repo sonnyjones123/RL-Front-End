@@ -34,7 +34,7 @@ class EMGPlot(QWidget):
     # Initializing Plotting Widget Panel
     def PlottingPanel(self):
         plottingPanel = QWidget()
-
+        plottingPanel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.plotWidget = pg.GraphicsLayoutWidget()
 
         # Creating Plotting Panel with numGraphs
@@ -45,7 +45,9 @@ class EMGPlot(QWidget):
             # exec(f"self.plot{numGraph} = self.plotWidget.addPlot(row = {numGraph}, col = 0)")
             exec(f"self.plot{numGraph}.setTitle(sensorMuscle)")
             exec(f"self.plotItem{numGraph} = self.plot{numGraph}.plot(self.samples, self.plottingBuffer[numGraph])")
-            
+
+        self.plotWidget.setMaximumSize(600, 700)
+        self.plotWidget.setMinimumSize(400, 700)  
         return plottingPanel
     
     #-----------------------------------------------------------------------------------

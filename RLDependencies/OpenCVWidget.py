@@ -45,7 +45,7 @@ class VideoWidget(QWidget):
         # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         # self.cap.set(cv2.CAP_PROP_FPS, 30)
-        self.frameRate = 30
+        self.frameRate = 33
         self.frameDelay = 1000 // self.frameRate
         self.videoWriter = None
 
@@ -61,7 +61,7 @@ class VideoWidget(QWidget):
         self.format = pyaudio.paInt16
         self.channels = 2
         self.rate = 44100
-        self.framesPerBuffer = 1336
+        self.framesPerBuffer = 1323
 
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format = self.format, channels = self.channels, rate = self.rate, input = True, frames_per_buffer = self.framesPerBuffer)
@@ -112,7 +112,7 @@ class VideoWidget(QWidget):
                 completePath = os.path.join(self.filePath, defaultName)
 
                 # Creating Outlet
-                self.videoWriter = cv2.VideoWriter(completePath, cv2.VideoWriter_fourcc(*'XVID'), 30.0, (self.outputWidth, self.outputHeight))
+                self.videoWriter = cv2.VideoWriter(completePath, cv2.VideoWriter_fourcc(*'XVID'), self.frameRate, (self.outputWidth, self.outputHeight))
             else:
                 # Formatting Custom File Name
                 customFileName = f"{fileName}.avi"
@@ -121,7 +121,7 @@ class VideoWidget(QWidget):
                 completePath = os.path.join(self.filePath, customFileName)
 
                 # Creating Outlet
-                self.videoWriter = cv2.VideoWriter(completePath, cv2.VideoWriter_fourcc(*'XVID'), 30.0, (self.outputWidth, self.outputHeight))
+                self.videoWriter = cv2.VideoWriter(completePath, cv2.VideoWriter_fourcc(*'XVID'), self.frameRate, (self.outputWidth, self.outputHeight))
         else:
             print("Video Outlet Already Exists")
 
@@ -177,7 +177,7 @@ class VideoWidget(QWidget):
     # Saving AUdio
     def saveAudio(self):
         if self.recording:
-            audioData = self.stream.read(1336)
+            audioData = self.stream.read(self.framesPerBuffer)
             self.audioWriter.writeframes(audioData)
             
     # Releasing Outlet
