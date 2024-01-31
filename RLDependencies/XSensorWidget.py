@@ -79,34 +79,7 @@ class XSensorWidget(QWidget):
         self.connectButton.setStyleSheet("color: grey")
         self.connectButton.setEnabled(False)
         XSensorPanelLayout.addWidget(self.connectButton)
-        """
-        # Process Data Button
-        self.processDataButton = QPushButton("Process Data", self)
-        self.processDataButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.processDataButton.objectName = 'Process Data Button'
-        self.processDataButton.clicked.connect(self.processDataCallback)
-        self.processDataButton.setStyleSheet("color: grey")
-        self.processDataButton.setEnabled(False)
-        XSensorPanelLayout.addWidget(self.processDataButton)
 
-        # Stop Button
-        self.stopButton = QPushButton("Stop", self)
-        self.stopButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.stopButton.objectName = 'Stop Button'
-        self.stopButton.clicked.connect(self.stopDataCollection)
-        self.stopButton.setStyleSheet("color: grey")
-        self.stopButton.setEnabled(False)
-        XSensorPanelLayout.addWidget(self.stopButton)
-
-        # Quit Button
-        self.quitButton = QPushButton("Quit", self)
-        self.quitButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.quitButton.objectName = 'Quit Button'
-        self.quitButton.clicked.connect(self.XSensorForce.quit)
-        self.quitButton.setStyleSheet("color: grey")
-        self.quitButton.setEnabled(False)
-        XSensorPanelLayout.addWidget(self.quitButton)
-        """
         # Setting Panel Layout
         XSensorPanel.setLayout(XSensorPanelLayout)
 
@@ -261,6 +234,38 @@ class XSensorWidget(QWidget):
         except Exception as e:
             print(e)
             print("Could not update XSensor display")
+
+    #-----------------------------------------------------------------------------------
+    # ---- Archived
+
+        """
+        # Process Data Button
+        self.processDataButton = QPushButton("Process Data", self)
+        self.processDataButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.processDataButton.objectName = 'Process Data Button'
+        self.processDataButton.clicked.connect(self.processDataCallback)
+        self.processDataButton.setStyleSheet("color: grey")
+        self.processDataButton.setEnabled(False)
+        XSensorPanelLayout.addWidget(self.processDataButton)
+
+        # Stop Button
+        self.stopButton = QPushButton("Stop", self)
+        self.stopButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.stopButton.objectName = 'Stop Button'
+        self.stopButton.clicked.connect(self.stopDataCollection)
+        self.stopButton.setStyleSheet("color: grey")
+        self.stopButton.setEnabled(False)
+        XSensorPanelLayout.addWidget(self.stopButton)
+
+        # Quit Button
+        self.quitButton = QPushButton("Quit", self)
+        self.quitButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.quitButton.objectName = 'Quit Button'
+        self.quitButton.clicked.connect(self.XSensorForce.quit)
+        self.quitButton.setStyleSheet("color: grey")
+        self.quitButton.setEnabled(False)
+        XSensorPanelLayout.addWidget(self.quitButton)
+        """
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -165,15 +165,15 @@ class DataFileHandler():
                 for key, value in metaData.items():
                     group[channelName].attrs[key] = value
 
+            # Adding to channel number
+            self.numChannels += 1
+
         except Exception as e:
             print(e)
             print("Group doesnt exist. Creating standalone channel")
             # Creating dataset in file
-            maxDataSize = (None,)
-            self.hdf5File.create_dataset(channelName, shape = (0,), maxshape = maxDataSize) 
-
-        # Adding to channel number
-        self.numChannels += 1
+            # maxDataSize = (None,)
+            # self.hdf5File.create_dataset(channelName, shape = (0,), maxshape = maxDataSize) 
 
     def openFile(self, fileName):
         # Opens file if not already open

@@ -42,7 +42,7 @@ class DelsysEMG:
     etc.  
 
     Author: Sonny Jones & Grange Simpson
-    Version: 2023.11.10
+    Version: 2024.01.31
 
     Usage:
 
@@ -230,8 +230,13 @@ class DelsysEMG:
         Selects individual sensor at specifided sensor number for streaming.
         NOTE: when refering to sensors, the sensors start at 0.
         """
-        # Selecting individual sensor at index sensor_num.
-        self.TrigBase.SelectSensor(sensorNum)
+        try:
+            sensorID = self.sensorNames[sensorNum]
+            sensorPairOrder = self.sensorDict[sensorID][0]
+            self.TrigBase.SelectSensor(sensorPairOrder)
+        except Exception as e:
+            print(e)
+            print(F"Unable to Select Sensor: {sensorNum}")
 
         # Updating Pipeline State
         self.status = self.TrigBase.GetPipelineState()
@@ -276,8 +281,11 @@ class DelsysEMG:
                 sensorID = self.sensorNames[sensorNum]
                 sensorPairOrder = self.sensorDict[sensorID][0]
                 self.TrigBase.SetSampleMode(sensorPairOrder, sampleMode)
-            except:
+            except Exception as e:
+                print(e)
                 print("Sensor Mode couldn't be set. SensorNum might be out of bounds of available sensors.")
+                print("Additionally, you might be trying to set a sensor to a sample mode it doesn't have.")
+                print(f"Sensor: {sensorNum + 1} SampleMode: {sampleMode}")
 
         print(f"Sample mode of {sensorList} set tp {sampleMode}" )
 
@@ -298,13 +306,12 @@ class DelsysEMG:
         # Setting sensor sensorNum to sampleMode. This works for lists.
         for sensorNum in range(len(sensorList)):
             if sensorList[sensorNum] == 1:
-                
                 try:
                     sensorID = self.sensorNames[sensorNum]
                     sensorPairOrder = self.sensorDict[sensorID][0] 
                     self.TrigBase.SetSampleMode(sensorPairOrder, sampleMode)
-                    # Increase the number of sensors connected for LSL
-                except:
+                except Exception as e:
+                    print(e)
                     print("Sensor Mode couldn't be set. SensorNum might be out of bounds of available sensors.")
 
         print(f"Sample mode of {sensorList} set tp {sampleMode}" )
@@ -321,9 +328,14 @@ class DelsysEMG:
         """
         # Setting all sensors to sampleMode
         for sensorNum in range(self.sensorsFound):
-            self.TrigBase.SetSampleMode(sensorNum, sampleMode)
-            # Increase the number of sensors connected for LSL
-            self.numSensorsConnected += 1
+            try:
+                self.TrigBase.SetSampleMode(sensorNum, sampleMode)
+                # Increase the number of sensors connected for LSL
+                self.numSensorsConnected += 1
+            except Exception as e:
+                print(e)
+                print("Sensosr Mode couldn't be set. You may be trying to set a sample mode for a sensor without that sample mode.")
+                print(f"Sensor: {sensorNum + 1} SmapleMode: {sampleMode}")
 
         # Updating Pipeline State
         self.status = self.TrigBase.GetPipelineState()

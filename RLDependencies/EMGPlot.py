@@ -18,10 +18,11 @@ class EMGPlot(QWidget):
     Usage: Check RL Front End, configureCallback Function
 
     """
-    def __init__(self, numGraphs=1, sensorDict=None, EMGSensors=None, recordingRate=None):
+    def __init__(self, numGraphs=1, sensorDict=None, sensorNames=None, EMGSensors=None, recordingRate=None):
         super().__init__()
         self.numGraphs = numGraphs
         self.sensorDict = sensorDict
+        self.sensorNames = sensorNames
         self.EMGSensors = EMGSensors
         self.bufferSize = 600
         self.samples = np.arange(-(self.bufferSize - 1), 1)
@@ -34,20 +35,47 @@ class EMGPlot(QWidget):
     # Initializing Plotting Widget Panel
     def PlottingPanel(self):
         plottingPanel = QWidget()
+        plottingLayout = QVBoxLayout()
         plottingPanel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+
+        # Creating List of Items for Display
+        self.sensorDisplayList = []
+
+        # Iterative Through
+        for i in range(self.numGraphs):
+            # Grabbing Information from sensorDict
+            sensorNumber = self.sensorNames.index(list(self.sensorDict.keys())[i]) + 1
+            sensorMuscle = self.sensorDict[self.EMGSensors[i]][1]
+
+            self.sensorDisplayList.append(f"Sensor {sensorNumber} : {sensorMuscle}")
+
+        # Sensor Selection
+        self.sensorDisplaySelection = QComboBox(self)
+        self.sensorDisplaySelection.addItems(self.sensorDisplayList)
+        self.sensorDisplaySelection.currentIndexChanged.connect(self.updateEMGPlot)
+
+        # Creating Plotting Widget
         self.plotWidget = pg.GraphicsLayoutWidget()
+        self.plot = self.plotWidget.addPlot()
+        # If only goniometers are being used
+        if (len(self.sensorDisplayList) > 0):
+            self.plot.setTitle(self.sensorDisplayList[0])
+            self.plotItem = self.plot.plot(self.samples, self.plottingBuffer[0])
 
-        # Creating Plotting Panel with numGraphs
-        for numGraph in range(self.numGraphs):
-            sensorMuscle = self.sensorDict[self.EMGSensors[numGraph]][1]
+        # Current Plot
+        self.currentPlot = 0
 
-            exec(f"self.plot{numGraph} = self.plotWidget.addPlot(title = sensorMuscle, row = {numGraph}, col = 0)")
-            # exec(f"self.plot{numGraph} = self.plotWidget.addPlot(row = {numGraph}, col = 0)")
-            exec(f"self.plot{numGraph}.setTitle(sensorMuscle)")
-            exec(f"self.plotItem{numGraph} = self.plot{numGraph}.plot(self.samples, self.plottingBuffer[numGraph])")
+        # Setting Size Constraints
+        self.plotWidget.setMaximumSize(800, 500)
+        self.plotWidget.setMinimumSize(600, 500)
+        plottingLayout.addWidget(self.plotWidget)
+        plottingLayout.addWidget(self.sensorDisplaySelection)
 
-        self.plotWidget.setMaximumSize(600, 700)
-        self.plotWidget.setMinimumSize(400, 700)  
+        # Adding Layout
+        plottingLayout.setContentsMargins(0, 0, 0, 0)
+        plottingLayout.setSpacing(0)
+        plottingPanel.setLayout(plottingLayout)
+
         return plottingPanel
     
     #-----------------------------------------------------------------------------------
@@ -60,24 +88,6 @@ class EMGPlot(QWidget):
         data to the end of the buffer. Updates each plot with the new data.
         """
 
-        """
-        # Creating Temporary Data Length Veriable
-        # Checking Dimension of Data
-        if len(np.array(data).shape) == 1:
-            # If Dimension is 1
-            lengthNewData = len(data)
-        else:
-            # If Dimension is 2+
-            lengthNewData = len(data[0])
-
-        # Rotating Buffers
-        self.plottingBuffer[:, (-lengthNewData - 1):-1] = data
-        self.prevSampleCount = self.sampleCount
-        self.sampleCount+= lengthNewData
-        self.samples = np.roll(self.samples, -lengthNewData)
-        self.samples[(-lengthNewData - 1):-1] = np.arange(self.prevSampleCount, self.sampleCount)
-        """
-
         self.plottingBuffer[:, -1] = data
         self.sampleCount += 1
         self.samples = np.roll(self.samples, -1)
@@ -85,14 +95,19 @@ class EMGPlot(QWidget):
         
         # Performing Graph Update on Timer Setting
         if self.updateTimer == 50:
-             for numGraph in range(self.numGraphs):
-                 exec(f"self.plotItem{numGraph}.setData(self.samples, self.plottingBuffer[numGraph])")
-             self.updateTimer = 0
+            self.plotItem.setData(self.samples, self.plottingBuffer[self.currentPlot])
+            self.updateTimer = 0
         else:
             self.updateTimer += self.recordingRate
 
         self.plottingBuffer = np.roll(self.plottingBuffer, -1, axis = 1)
         # self.plottingBuffer = np.roll(self.plottingBuffer, -lengthNewData, axis = 1)
+
+    # Updating Current Plot
+    def updateEMGPlot(self):
+        # Updating Current Plot Index and Title
+        self.currentPlot = self.sensorDisplayList.index(self.sensorDisplaySelection.currentText())
+        self.plot.setTitle(self.sensorDisplaySelection.currentText())
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)

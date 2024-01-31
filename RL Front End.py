@@ -3,7 +3,7 @@ This is the main Reinforcement Learning GUI that incorperates the DelsyEMG contr
 and XSensor Control Class. This GUI is used to control each data acqusition device and create a pipeline for saving data in real time.
 
 Written by Sonny Jones & Grange Simpson
-Version: 2024.01.17
+Version: 2024.01.31
 
 Usage: Run the file.
 
@@ -413,8 +413,9 @@ class MyWidget(QMainWindow):
 
                     # Buffer is cleared in plotEMGGUI
                     averageEMG = self.DelsysEMG.plotEMGGUI()                
-
-                    self.EMGPlot.plotEMG(averageEMG)
+                    # Only plotting if EMG sensors have been added
+                    if (len(self.DelsysEMG.numEMGChannels) > 0):
+                        self.EMGPlot.plotEMG(averageEMG)
             except Exception as e:
                 print("Issue processing Delsys Data")
                 print(e)
@@ -441,7 +442,7 @@ class MyWidget(QMainWindow):
         # Video Processing
         if self.videoTimer >= self.videoCapture.frameDelay:
             self.videoCapture.dataProcessing()
-            self.videoTimer = 0
+            self.videoTimer = 0 
         else:
             self.videoTimer += self.recordingRate
     
@@ -602,6 +603,9 @@ class MyWidget(QMainWindow):
         self.configureButton.setEnabled(True)
         self.configureButton.setStyleSheet('QPushButton {color: black;}')
 
+        # Clearing Sensor Selection 
+        self.resetSensorSelectionCallback()
+
     # Set All Sample Mode Callback
     def setAllSampleModeCallback(self):
         # Setting Sample Mode of Sensors
@@ -611,6 +615,9 @@ class MyWidget(QMainWindow):
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
         self.configureButton.setEnabled(True)
         self.configureButton.setStyleSheet('QPushButton {color: black;}')
+
+        # Clearing Sensor Selection 
+        self.resetSensorSelectionCallback()
 
     # Configure Callback
     def configureCallback(self):
@@ -626,8 +633,8 @@ class MyWidget(QMainWindow):
 
         # Adding Sensor Plots
         if self.EMGPlot is None:
-            self.EMGPlot = EMGPlot(self.DelsysEMG.numEMGChannels, self.DelsysEMG.sensorDict, self.DelsysEMG.EMGSensors, self.recordingRate)
-            self.splitter.insertWidget(1, self.EMGPlot.plotWidget)
+            self.EMGPlot = EMGPlot(self.DelsysEMG.numEMGChannels, self.DelsysEMG.sensorDict, self.DelsysEMG.sensorNames, self.DelsysEMG.EMGSensors, self.recordingRate)
+            self.splitter.insertWidget(1, self.EMGPlot.plottingPanel)
             
             self.splitter.setStretchFactor(1, 3)
             self.splitter.update()
