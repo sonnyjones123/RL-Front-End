@@ -1,8 +1,4 @@
-<!-- PROJECT SHIELDS -->
-[![Contributors][contributors-shield]][contributors-url]
-
-# DelsysSystem
-Reinforcement Learning GUI System  
+# Reinforcement Learning GUI System  
 NERVES Lab  
 Department of Biomedical Engineering  
 University of Utah  
@@ -10,17 +6,7 @@ University of Utah
 ---
 
 Written by Sonny Jones & Grange Simpson
-Last Updated: 12/07/2023
+Last Updated: 2024/01/31
 
----
-
-This repository contains a PyQt Gui built out for dynamic control and plotting for the DelsysEMG system. This includes classes built out for Python control of the Delsy EMG Trigno Base, EMG plotting, Xsensor Force Insoles, and Camera Control Software using OpenCV and PyAudio.
-
----
-
-Usage SOP:  
-Hardware Connection Procedure: XSensor Force -> Delsys EMG -> Ready to Go.  
-
-1) 
 
 
