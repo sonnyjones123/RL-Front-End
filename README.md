@@ -8,5 +8,7 @@ University of Utah
 Written by Sonny Jones & Grange Simpson
 Last Updated: 2024/01/31
 
+---
 
+Please check Wiki for Install Instructions.
 
