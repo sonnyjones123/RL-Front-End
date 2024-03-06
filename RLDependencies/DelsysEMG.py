@@ -22,7 +22,12 @@ elif (platform.node() == 'Purkinje'):
 
 from AeroPy.TrignoBase import *
 from AeroPy.DataManager import *
-from NERVESLabKeys import *
+
+try:
+    from RLDependencies.NERVESLabKeys import *
+    from NERVESLabKeys import *
+except:
+    pass
 
 class DelsysEMG:
     """
@@ -41,7 +46,7 @@ class DelsysEMG:
     etc.  
 
     Author: Sonny Jones & Grange Simpson
-    Version: 2024.01.31
+    Version: 2024.03.06
 
     Usage:
 
@@ -62,18 +67,17 @@ class DelsysEMG:
         self.numSensorsConnected = 0
         self.status = "Off"
 
+        self.sensorsScannedOrder = []
+        self.sensorsScannedOrderCheck = []
+
         # Text Input Box
         self.ROOT = tk.Tk()
         self.ROOT.withdraw()
 
-        # LSL objects to be filled in when configure is pressed.
-        self.LSLSender = 0
-        self.LSLReceiver = 0
-
         # Sample Mode List
         self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz',
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-5.5mV, 2-30Hz',
-                               'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz',
+                               'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz', 
                                'SIG raw x4 (519Hz) (x1813)']
         
         # Data Saving File Structure
@@ -102,7 +106,6 @@ class DelsysEMG:
             self.status = "Connection Refused"
             print("TrignoBase Not Connected")
         
-
     def checkStatus(self):
         """
         Checks the pipline status of the Delsys EMG system.
@@ -140,20 +143,19 @@ class DelsysEMG:
             # CheckPairStatus will be false when sensor is paired
             while self.TrigBase.CheckPairStatus():
                 continue
-            
-            # [TODO] Need to check why adding 1 sensors on accident multiple times causes errors 
 
             # Adding sensorNames and sensorNum to dict
-            for sensorName in self.TrigBase.GetSensorNames():
+            for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
                 tempSensorName = sensorName.split(" ")[0]
                 if int(tempSensorName) in self.sensorDict.keys():
-                    continue
+                    # Updating Index
+                    self.sensorDict[int(tempSensorName)][0] = index
                 else:
-                    self.sensorDict[int(tempSensorName)] = [num]
+                    self.sensorDict[int(tempSensorName)] = [index]
 
                     # Asking user for input
                     sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                                                          prompt = 'Please indicate what muscle this sensor will be on.', parent=self.ROOT)
+                                                          prompt = f'Please indicate what muscle sensor {self.sensorNames.index(int(tempSensorName)) + 1} will be on.', parent=self.ROOT)
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
             tempSensorKey = list(self.sensorDict.keys())
@@ -162,7 +164,12 @@ class DelsysEMG:
 
         # Required otherwise pipeline state doesn't update
         self.TrigBase.ScanSensors()
-
+        for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+            # Seeing what the actual order of adding sensors is
+            self.sensorsScannedOrder.append(sensorName)
+            sensorObject = self.TrigBase.GetSensorObject(index)
+            self.sensorsScannedOrderCheck.append(sensorObject.Properties.get_Sid())
+    
         # Getting Number of Sensors
         self.sensorsFound = len(self.sensorDict.keys())
         
@@ -185,9 +192,11 @@ class DelsysEMG:
             #time.sleep(1)
             self.scanForSensors()
 
-        # Iterating along backwards since sensors get scanned in reverse from the original order they were added
-        sensorList = list(self.TrigBase.GetSensorNames())
-        for index, sensorName in enumerate(sensorList):
+        # Iterating Along Current Sensor Names
+        for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+            # Seeing what the actual order of adding sensors is
+            self.sensorsScannedOrder.append(sensorName)
+
             tempSensorName = sensorName.split(" ")[0]
             if int(tempSensorName) in self.sensorDict.keys():
                 continue
@@ -199,8 +208,8 @@ class DelsysEMG:
                                                         prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
                 self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
-        # Array of sensorNames, and their index
-        self.sensorNames
+        print(self.sensorsScannedOrder)
+
         # Getting Number of Sensors
         self.sensorsFound = len(self.sensorDict.keys())
         
@@ -234,6 +243,7 @@ class DelsysEMG:
             sensorID = self.sensorNames[sensorNum]
             sensorPairOrder = self.sensorDict[sensorID][0]
             self.TrigBase.SelectSensor(sensorPairOrder)
+
         except Exception as e:
             print(e)
             print(F"Unable to Select Sensor: {sensorNum}")
@@ -350,7 +360,6 @@ class DelsysEMG:
         # Creating data manager class
         self.DataHandler = DataKernel(self.TrigBase)
         self.DataHandler.packetCount = 0
-        self.DataHandler.allcollectiondata = [[]]
 
         # Checking to see if Delsys EMG is in connected state.
         if self.TrigBase.GetPipelineState() == "Connected":
@@ -370,14 +379,19 @@ class DelsysEMG:
             self.numEMGChannels = 0
             self.samplesPerFrame = [[] for i in range(self.sensorsFound)]
             self.dataSavingSensorDict = {}
+            self.collectionOutputOrder = []
 
             # Looping through sensor list
             for sensorNum in range(self.sensorsFound):
-                # Creating temp sensor name                
-                tempSensorName = f"Sensor {self.sensorNames.index(list(self.sensorDict.keys())[sensorNum]) + 1}"
-
                 # Selecting sensor object
                 selectedSensor = self.TrigBase.GetSensorObject(sensorNum)
+
+                # Getting Sensor ID
+                sensorID = selectedSensor.Properties.get_Sid()
+
+                # Creating temp sensor name                
+                tempSensorName = f"Sensor {self.sensorNames.index(sensorID) + 1}"
+                
                 # Checking to see if sensor channels are greated than 0.
                 if len(selectedSensor.TrignoChannels) > 0:
                     # Creating temp chanName and sampleRate lists
@@ -385,24 +399,29 @@ class DelsysEMG:
                     tempSampRateList = []
                     # Looping through num of channels in sensor sensorNum.
                     for channel in range(len(selectedSensor.TrignoChannels)):
+                        # Updating Channel Count
                         self.channelCount += 1
-                        self.DataHandler.allcollectiondata.append([])
-                        self.channelNames.append(selectedSensor.TrignoChannels[channel].Name)
-                        self.sampleRates.append(selectedSensor.TrignoChannels[channel].SampleRate)
-                        self.samplesPerFrame.append(selectedSensor.TrignoChannels[channel].SamplesPerFrame)
-                        tempChanNameList.append(selectedSensor.TrignoChannels[channel].Name)
-                        tempSampRateList.append(selectedSensor.TrignoChannels[channel].SampleRate)
-                        # Adding in start and stop times
+
+                        # Grabbing Sensor Object and Appending Relevant Information
+                        channelObject = selectedSensor.TrignoChannels[channel]
+                        self.channelNames.append(channelObject.Name)
+                        self.sampleRates.append(channelObject.SampleRate)
+                        self.samplesPerFrame.append(channelObject.SamplesPerFrame)
+                        tempChanNameList.append(channelObject.Name)
+                        tempSampRateList.append(channelObject.SampleRate)
+                        
+                        # Adding Channel ID
+                        self.collectionOutputOrder.append(channelObject.Id)
 
                         # Updating numEMGChannels
                         if 'EMG' in selectedSensor.TrignoChannels[channel].Name:
                             self.numEMGChannels += 1    
-                            self.EMGSensors.append(list(self.sensorDict.keys())[sensorNum])  
+                            self.EMGSensors.append(sensorID)  
 
-                # Adding to DataSavingSensorDict
-                self.dataSavingSensorDict[tempSensorName] = {'Channels': tempChanNameList,
+                    # Adding to DataSavingSensorDict
+                    self.dataSavingSensorDict[tempSensorName] = {'Channels': tempChanNameList,
                                                              'SampleRates' : tempSampRateList,
-                                                             'Attachment' : self.sensorDict[list(self.sensorDict.keys())[sensorNum]][1]}
+                                                             'Attachment' : self.sensorDict[sensorID][1]}
 
     def startDataCollection(self):
         # Starting Data Collection
@@ -425,29 +444,52 @@ class DelsysEMG:
         our current data buffer with the incoming data packets.
         """    
         # Checking Data Queue
-        dataReady = self.TrigBase.CheckDataQueue()
+        dataReady = self.TrigBase.CheckDataQueue()                      # Check if DelsysAPI real-time data queue is ready to retrieve
         if dataReady:
-            DataOut = self.TrigBase.PollData()
-            outArr = [[] for i in range(len(DataOut.Keys))]
-            keys = []
-            for i in DataOut.Keys:
-                keys.append(i)
-            for j in range(len(DataOut.Keys)):
-                outBuf = DataOut[keys[j]]
-                outArr[j].append(np.asarray(outBuf, dtype='object'))
+            DataOut = self.TrigBase.PollData()                          # Dictionary<Guid, List<double>> (key = Guid (Unique channel ID), value = List(Y) (Y = sample value)
+            outArr = [[] for i in range(len(DataOut.Keys))]             # Set output array size to the amount of channels being outputted from the DelsysAPI
+            keys = list(DataOut.Keys)                                   # Generate a list of all channel GUIDs in the dictionary
+            
+            for j in range(len(DataOut.Keys)):                          # loop all channels
+                outBuf = DataOut[keys[j]]                               # Index a single channels data from the dictionary based on unique channel GUID (key)
+                outArr[j].append(np.asarray(outBuf, dtype='object'))    # Create a NumPy array of the channel data and add to the output array
             return outArr
         else:
             return None
             
+
+    def GetData(self):
+        """ Check if data ready from DelsysAPI via Aero CheckDataQueue() - Return True if data is ready
+            Get data (PollData)
+            Organize output channels by their GUID keys
+
+            Return array of all channel data
+        """
+        # If Data Is In Queue
+        dataReady = self.TrigBase.CheckDataQueue()                      # Check if DelsysAPI real-time data queue is ready to retrieve
+        if dataReady:
+            # Grabbing Data from TrignoBase
+            DataOut = self.TrigBase.PollData()                          # Dictionary<Guid, List<double>> (key = Guid (Unique channel ID), value = List(Y) (Y = sample value)
+            outArr = [[] for i in range(len(DataOut.Keys))]             # Set output array size to the amount of channels being outputted from the DelsysAPI
+
+            # Iterating Through CollectionOutputOrder
+            for j in range(len(self.collectionOutputOrder)):
+                # Grabbing Data from Key and Appending to OurArr
+                chan_data = DataOut[self.collectionOutputOrder[j]]
+                outArr[j].append(np.asarray(chan_data, dtype = 'object'))
+
+            return outArr
+        else:
+            return None
+
     def processData(self):
         """
         The checkData function outputs a System.Collections.Generic dictionary object. This function
         will clean up the data from the checkData function and output it into a Python dictionary.
         """
-        outArr = self.getData()
+        #outArr = self.getData()
+        outArr = self.GetData()
         if outArr is not None:
-            #for i in range(len(outArr)):
-            #    self.DataHandler.allcollectiondata[i].extend(outArr[i][0].tolist())
             try:
                 for i in range(len(outArr[0])):
                     if np.asarray(outArr[0]).ndim == 1:
@@ -543,6 +585,3 @@ class DelsysEMG:
         # Returning string formatted EMG data
         return averageEMG
         #return emgData
-    
-    def returnAllData(self):
-        return self.DataHandler.allcollectiondata

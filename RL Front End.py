@@ -414,8 +414,8 @@ class MyWidget(QMainWindow):
                     # Buffer is cleared in plotEMGGUI
                     averageEMG = self.DelsysEMG.plotEMGGUI()                
                     # Only plotting if EMG sensors have been added
-                    if (len(self.DelsysEMG.numEMGChannels) > 0):
-                        self.EMGPlot.plotEMG(averageEMG)
+                    #if (self.DelsysEMG.numEMGChannels > 0):
+                    self.EMGPlot.plotEMG(averageEMG)
             except Exception as e:
                 print("Issue processing Delsys Data")
                 print(e)
@@ -481,6 +481,8 @@ class MyWidget(QMainWindow):
 
         # Closing Note Taking File
         if self.noteTaker.file is not None:
+            # Save any notes taken in the notetaker that weren't added thken close
+            self.noteTaker.addNoteCallback()
             self.noteTaker.closeTextFile()
 
         print("Clean Up Successful")

@@ -44,7 +44,7 @@ class EMGPlot(QWidget):
         # Iterative Through
         for i in range(self.numGraphs):
             # Grabbing Information from sensorDict
-            sensorNumber = self.sensorNames.index(list(self.sensorDict.keys())[i]) + 1
+            sensorNumber = self.sensorNames.index(self.EMGSensors[i]) + 1
             sensorMuscle = self.sensorDict[self.EMGSensors[i]][1]
 
             self.sensorDisplayList.append(f"Sensor {sensorNumber} : {sensorMuscle}")

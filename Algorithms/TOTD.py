@@ -10,7 +10,7 @@ class TOTD(SelectiveKanervaCoding):
         # SelectiveKanervaCoding
         self.SKC = SelectiveKanervaCoding(studyID = studyID, numInputs = numStates)
 
-        # [TODO: add initialization for w, e, V_old, S, x]
+        # [TODO: add initialization for S]
         # Initializing params
         self.alpha = alpha
         self.gamma = gamma
@@ -19,6 +19,8 @@ class TOTD(SelectiveKanervaCoding):
         self.numStates = numStates
         self.weights = np.zeros(numStates)
         self.eligibility = np.zeros(numStates)
+        self.VOld = np.zeros(numStates)
+        self.x = np.zeros(numStates * self.SKC.K)
 
     #-----------------------------------------------------------------------------------
     # ---- TOTD Update Algorithm

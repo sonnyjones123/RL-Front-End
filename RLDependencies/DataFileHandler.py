@@ -93,6 +93,9 @@ class DataFileHandler():
                     print('Channels and SampleRates are not the same length')
                     pass
 
+                # Creating Element if Needing to Add Additional Channels
+                self.extra = 1
+
                 # Creating datasets for each channel, 
                 for i in range(len(datasets['Channels'])):
                     print(datasets['Channels'][i])
@@ -168,12 +171,27 @@ class DataFileHandler():
             # Adding to channel number
             self.numChannels += 1
 
-        except Exception as e:
-            print(e)
-            print("Group doesnt exist. Creating standalone channel")
-            # Creating dataset in file
-            # maxDataSize = (None,)
-            # self.hdf5File.create_dataset(channelName, shape = (0,), maxshape = maxDataSize) 
+        except:
+            # Accessing group in file
+            group = self.hdf5File[groupName]
+            # Adding dataset to group
+            maxDataSize = (None,)
+
+            # Creating Temp Channel Name
+            tempChanName = f"{channelName}_{self.extra}"
+            group.create_dataset(tempChanName, shape = (0,), maxshape = maxDataSize)
+
+            # Incrementing Extra Index
+            self.extra += 1
+
+            # Adding metadata if available
+            if metaData is not None:
+                # Adding metadata
+                for key, value in metaData.items():
+                    group[channelName].attrs[key] = value
+
+            # Adding to channel number
+            self.numChannels += 1
 
     def openFile(self, fileName):
         # Opens file if not already open
@@ -202,7 +220,10 @@ class DataFileHandler():
         else:
             # Indexing param
             index = 0
-
+            """
+            [TODO:]
+            Area where different sensor ordering could mess up where data is being saved in the h5pyfiles
+            """
             # Looping through sensors
             for sensor in list(self.DelsysFileStructure.keys()):
                 if ("Sensor" in sensor):

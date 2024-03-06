@@ -41,7 +41,6 @@ class XSensorForce:
 
         # Buffers
         self.dataBuffer = []
-        self.allCollectionDataBuffer = []
         self.frameNumber = 0
 
         # pre-define some variables to hold data from the DLL.
@@ -209,7 +208,7 @@ class XSensorForce:
             sensorName = str(nameBuff.value.decode('utf-8'))
 
             # Setting up Data Saving Dictionary
-            tempName = f'Foot {self.sensorIndex}'
+            tempName = f'Foot {self.sensorIndex + 1}'
             if sensorName.split('-')[2] == 'LF':
                 tempSensorOrientation = 'Left'
             elif sensorName.split('-')[2] == 'RF':
@@ -288,10 +287,7 @@ class XSensorForce:
                 # Retrieving Frame
                 if self.xscore.XS_GetPressure(sensorPID, ctypes.byref(frameBuffer)) == 1:
                     # Dump Frame
-                    self.dataBuffer[sensor] = frameBuffer
-
-            # Appending Data to All Collection Data Buffer
-            self.allCollectionDataBuffer.append(self.dataBuffer)        
+                    self.dataBuffer[sensor] = frameBuffer      
 
     def stopDataCollection(self):
         """
