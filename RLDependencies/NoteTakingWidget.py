@@ -57,6 +57,14 @@ class NoteTakerWidget(QWidget):
         self.addNoteButton.setStyleSheet("QPushButton {color: grey;}")
         self.addNoteButton.setEnabled(False)
         noteTakerLayout.addWidget(self.addNoteButton)
+
+        # Mark Transition Timepoint Button
+        self.markTransitionButton = QPushButton("Mark Transition Time")
+        self.markTransitionButton.objectName = "Mark Transition Time Button"
+        self.markTransitionButton.clicked.connect(self.markTransitionCallback)
+        self.markTransitionButton.setStyleSheet("QPushButton {color: grey;}")
+        self.markTransitionButton.setEnabled(False)
+        noteTakerLayout.addWidget(self.markTransitionButton)
         
         # Add in saving button
         noteTakerPanel.setLayout(noteTakerLayout)
@@ -73,6 +81,11 @@ class NoteTakerWidget(QWidget):
 
         # Clearing Note From QTextEdit
         self.text_edit.clear()
+
+    def markTransitionCallback(self):
+        # Mark transition timepoint with a timestamp
+        message = f"{self.trialName}({datetime.now().timestamp()}): Terrain Transition \n" 
+        self.file.write(message)
 
     # Create Text File Button
     def createTextFile(self, experimentName):

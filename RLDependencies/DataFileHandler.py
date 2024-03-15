@@ -220,10 +220,7 @@ class DataFileHandler():
         else:
             # Indexing param
             index = 0
-            """
-            [TODO:]
-            Area where different sensor ordering could mess up where data is being saved in the h5pyfiles
-            """
+            
             # Looping through sensors
             for sensor in list(self.DelsysFileStructure.keys()):
                 if ("Sensor" in sensor):
@@ -233,11 +230,11 @@ class DataFileHandler():
                             dataset = self.hdf5File[f'{sensor}/{channel}']
                             
                             # Getting current size and reindexing
-                            current_size = dataset.shape[0]
-                            dataset.resize(current_size + len(data[0][index]), axis = 0)
+                            currentLength = dataset.shape[0]
+                            dataset.resize(currentLength + len(data[0][index]), axis = 0)
                             
                             # Setting new data
-                            dataset[current_size:current_size + len(data[0][index])] = list(data[0][index])
+                            dataset[currentLength:currentLength + len(data[0][index])] = list(data[0][index])
 
                         except Exception as e:
                             print(e)
@@ -260,11 +257,11 @@ class DataFileHandler():
                     try:
                         dataset = self.hdf5File[f'{sensor}/{channel}']
                         # Getting current data from xsensor, saving full array for now
-                        current_size = dataset.shape[0]
-                        dataset.resize(current_size + len(data[index]), axis = 0)
+                        currentLength = dataset.shape[0]
+                        dataset.resize(currentLength + len(data[index]), axis = 0)
 
                         # Setting new data
-                        dataset[current_size:current_size + len(data[index])] = data[index]
+                        dataset[currentLength:currentLength + len(data[index])] = data[index]
 
                     except Exception as e:
                         print(e)

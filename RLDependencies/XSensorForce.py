@@ -297,6 +297,10 @@ class XSensorForce:
 
         # Resetting Buffer
         self.dataBuffer = []
+        exec(f"self.dataBuffer{self.sensorIndex} = []")
+
+        # Creating dataBuffer object
+        self.dataBuffer.append([np.zeros(self.senselRows.value * self.senselColumns.value)])
 
     def releaseConfig(self):
         """

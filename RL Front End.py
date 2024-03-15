@@ -3,7 +3,7 @@ This is the main Reinforcement Learning GUI that incorperates the DelsyEMG contr
 and XSensor Control Class. This GUI is used to control each data acqusition device and create a pipeline for saving data in real time.
 
 Written by Sonny Jones & Grange Simpson
-Version: 2024.01.31
+Version: 2024.03.07
 
 Usage: Run the file.
 
@@ -23,6 +23,7 @@ from RLDependencies.OpenCVWidget import *
 from RLDependencies.XSensorWidget import *
 from RLDependencies.DataFileHandler import *
 from RLDependencies.NoteTakingWidget import *
+from RLDependencies.AudioVideoMuxing import combineAudioVideo
 
 class MyWidget(QMainWindow):
     def __init__(self):
@@ -94,6 +95,13 @@ class MyWidget(QMainWindow):
         # Data Collection Ready
         self.ready = False
 
+        # Default Delsys Sensor Configurations, no ekg right now
+        self.selectedEMGSensors = [0, 1, 2, 3, 4, 5, 6, 7]
+        self.selectedGoniometerSensors = [14, 15]
+        self.emgMode = 'EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz'
+        self.goniometerMode = 'SIG raw x4 (519Hz) (x1813)'
+        self.defaultDelsysAttachments = ['TAL', 'TAR', 'LGL', 'LGR', 'VLL', 'VLR', 'BFL', 'BFR','None', 'None', 'None', 'None', 'None', 'LK', 'RK']
+
     #-----------------------------------------------------------------------------------
     # ---- Controller for Components
     def componentController(self):
@@ -103,15 +111,17 @@ class MyWidget(QMainWindow):
 
         # Creating Label for Components
         controllerPanel = QWidget()
-        controllerPanel.setFixedSize(300, 100)
+        controllerPanel.setFixedSize(300, 150)
         
         controllerLayout = QVBoxLayout()
         controllerLayout.setAlignment(Qt.AlignTop)
-
+        
         # Components Label
-        self.componentsLabel = QLabel("<b>Components</b>", alignment = Qt.AlignCenter)
+        #self.componentsLabel = QLabel("<b>Components</b>", alignment = Qt.AlignCenter)
+        self.componentsLabel = QLabel("<b>Components</b>")
         self.componentsLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
         controllerLayout.addWidget(self.componentsLabel)
+        
 
         # Delsys CheckBox
         self.delsysCheckBox = QCheckBox("Delsys (EMG, EKG)")
@@ -120,12 +130,20 @@ class MyWidget(QMainWindow):
         self.delsysCheckBox.stateChanged.connect(self.delsysCheckedCallback)
         controllerLayout.addWidget(self.delsysCheckBox)
         
+        
         # XSensor CheckBox
         self.XSensorCheckBox = QCheckBox("XSensor")
         self.XSensorCheckBox.setStyleSheet('QCheckBox {color: black;}')
         self.XSensorCheckBox.setChecked(False)
         self.XSensorCheckBox.stateChanged.connect(self.XSensorCheckedCallback)
         controllerLayout.addWidget(self.XSensorCheckBox)
+
+        # Delsys Default Sensors CheckBox
+        self.DefaultDelsysSensorsCheckBox = QCheckBox("Default Delsys Sensors")
+        self.DefaultDelsysSensorsCheckBox.setStyleSheet('QCheckBox {color: black;}')
+        self.DefaultDelsysSensorsCheckBox.setChecked(False)
+        self.DefaultDelsysSensorsCheckBox.stateChanged.connect(self.DelsysDefaultSettingsCheckedCallback)
+        controllerLayout.addWidget(self.DefaultDelsysSensorsCheckBox)
 
         # Adding to Panel
         controllerPanel.setLayout(controllerLayout)
@@ -285,6 +303,16 @@ class MyWidget(QMainWindow):
         
         # Adding to main layout
         delsysButtonLayout.addLayout(findSensorLayout)
+
+        # Default Delsys Sensor Configuration Button
+        self.defaultDelsysSensorsButton = QPushButton("Use Default Sensor Configuration", self)
+        self.defaultDelsysSensorsButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.defaultDelsysSensorsButton.objectName = 'Default Sensor Configuration'
+        self.defaultDelsysSensorsButton.clicked.connect(self.DelsysDefaultSettingsCallback)
+        self.defaultDelsysSensorsButton.setStyleSheet('color: grey')
+        self.defaultDelsysSensorsButton.setEnabled(False)
+        # Adding to main layout
+        delsysButtonLayout.addWidget(self.defaultDelsysSensorsButton)
 
         # Adding label
         self.sensorGridLabel = QLabel("<b>Sensor Selection Grid</b>", self, alignment = Qt.AlignCenter)
@@ -481,9 +509,17 @@ class MyWidget(QMainWindow):
 
         # Closing Note Taking File
         if self.noteTaker.file is not None:
-            # Save any notes taken in the notetaker that weren't added thken close
+            # Save any notes taken in the notetaker that weren't added then close
             self.noteTaker.addNoteCallback()
             self.noteTaker.closeTextFile()
+
+        # Muxxing Files
+        print("Muxing Audio and Video files...")
+        try:
+            combineAudioVideo(self.videoCapture.filePath)
+            print("Muxing Completed")
+        except:
+            pass
 
         print("Clean Up Successful")
 
@@ -514,45 +550,107 @@ class MyWidget(QMainWindow):
     
     # Delsys Pair Sensor Callback
     def pairSensorCallback(self):
-        # Pairing Sensors
-        self.DelsysEMG.connectSensors(self.sensorNumber.text())
+        
+        # Default settings for delsys sensors and attachments has been selected.
+        if ("Default Delsys" in self.componentTracker):
+            # Pairing Sensors
+            #self.DelsysEMG.connectSensors(self.sensorNumber.text())
+            self.DelsysEMG.connectSensors(len(self.selectedEMGSensors) + len(self.selectedGoniometerSensors), self.defaultDelsysAttachments)
 
-        # Updating GUI
-        # Delsys Status
-        self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+            # Updating GUI
+            # Delsys Status
+            self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
 
-        # Select Sensor Button
-        self.selectSensorButton.setEnabled(True)
-        self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
+            # Select Sensor Button
+            self.selectSensorButton.setEnabled(True)
+            self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
 
-        # Select All Sensor Button
-        self.selectAllSensorButton.setEnabled(True)
-        self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
+            # Select All Sensor Button
+            self.selectAllSensorButton.setEnabled(True)
+            self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
 
-        # Reset Sensor Button
-        self.resetSensorSelection.setEnabled(True)
-        self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
+            # Reset Sensor Button
+            self.resetSensorSelection.setEnabled(True)
+            self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
+
+            # Default Sensor Configurations Button
+            self.defaultDelsysSensorsButton.setEnabled(True)
+            self.defaultDelsysSensorsButton.setStyleSheet('QPushButton {color: black;}')
+
+        else:
+            # Pairing Sensors
+            self.DelsysEMG.connectSensors(self.sensorNumber.text())
+
+            # Updating GUI
+            # Delsys Status
+            self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+            # Select Sensor Button
+            self.selectSensorButton.setEnabled(True)
+            self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+            # Select All Sensor Button
+            self.selectAllSensorButton.setEnabled(True)
+            self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+            # Reset Sensor Button
+            self.resetSensorSelection.setEnabled(True)
+            self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
+
+            # Default Sensor Configurations Button
+            self.defaultDelsysSensorsButton.setEnabled(True)
+            self.defaultDelsysSensorsButton.setStyleSheet('QPushButton {color: black;}')
 
     # Delsys Scan Sensor Callback
     def scanSensorCallback(self):
-        # Scan for Connected Sensors
-        self.DelsysEMG.scanForSensors()
+        if ("Default Delsys" in self.componentTracker):
+            # Scan for Connected Sensors
+            self.DelsysEMG.scanForSensors(self.defaultDelsysAttachments)
 
-        # Updating GUI
-        # Delsys Status
-        self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+            # Updating GUI
+            # Delsys Status
+            self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
 
-        # Select Sensor Button
-        self.selectSensorButton.setEnabled(True)
-        self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
+            # Select Sensor Button
+            self.selectSensorButton.setEnabled(True)
+            self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
 
-        # Select All Sensor Button
-        self.selectAllSensorButton.setEnabled(True)
-        self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
+            # Select All Sensor Button
+            self.selectAllSensorButton.setEnabled(True)
+            self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
 
-        # Reset Sensor Selection Button
-        self.resetSensorSelection.setEnabled(True)
-        self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
+            # Reset Sensor Selection Button
+            self.resetSensorSelection.setEnabled(True)
+            self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
+
+            # Default Sensor Configurations Button
+            self.defaultDelsysSensorsButton.setEnabled(True)
+            self.defaultDelsysSensorsButton.setStyleSheet('QPushButton {color: black;}')
+        
+        else:
+            # Scan for Connected Sensors
+            self.DelsysEMG.scanForSensors()
+
+            # Updating GUI
+            # Delsys Status
+            self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
+
+            # Select Sensor Button
+            self.selectSensorButton.setEnabled(True)
+            self.selectSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+            # Select All Sensor Button
+            self.selectAllSensorButton.setEnabled(True)
+            self.selectAllSensorButton.setStyleSheet('QPushButton {color: black;}')
+
+            # Reset Sensor Selection Button
+            self.resetSensorSelection.setEnabled(True)
+            self.resetSensorSelection.setStyleSheet('QPushButton {color: black;}')
+
+            # Default Sensor Configurations Button
+            self.defaultDelsysSensorsButton.setEnabled(True)
+            self.defaultDelsysSensorsButton.setStyleSheet('QPushButton {color: black;}')
+            
 
     # Delsys Select Sensor Callback
     def selectSensorCallback(self):
@@ -641,6 +739,9 @@ class MyWidget(QMainWindow):
             self.splitter.setStretchFactor(1, 3)
             self.splitter.update()
 
+    def DelsysDefaultSettingsCallback(self):
+        pass
+
     # Configuring File for Data Saving
     def configureDataFileCallback(self):
         print("Configuring Save File...")
@@ -717,6 +818,9 @@ class MyWidget(QMainWindow):
             self.noteTaker.addNoteButton.setEnabled(True)
             self.noteTaker.addNoteButton.setStyleSheet('QPushButton {color: black;}')
             
+            self.noteTaker.markTransitionButton.setEnabled(True)
+            self.noteTaker.markTransitionButton.setStyleSheet('QPushButton {color: black;}')
+            
             # Adding Trial Name to Note Taker Widget
             self.noteTaker.addTrialName(self.trialEntry.currentText())
         except Exception as e:
@@ -762,9 +866,13 @@ class MyWidget(QMainWindow):
 
     # Start Data Collection Callback
     def startDataCollectionCallback(self):
-        # Start Data Collection on All Platforms
-        self.DelsysEMG.startDataCollection()
-        self.xSensorWidget.XSensorForce.allCollectionDataBuffer = []
+        try:
+            # Start Data Collection on Delsys
+            self.DelsysEMG.startDataCollection()
+        except:
+            print('Delsys Not Connected')
+        
+        # Start Data Collection on Other Platforms
         self.recording = True
         self.videoCapture.recording = True
 
@@ -796,7 +904,7 @@ class MyWidget(QMainWindow):
         # Adding stop time to file
         self.DataFileHandler.addStopTime(datetime.now().timestamp())
         
-        self.xSensorWidget.stopDataCollection()
+        #self.xSensorWidget.stopDataCollection()
         self.delsysStatus.setText("<b>Delsys Status: </b>" + self.DelsysEMG.status)
         
         # Updating GUI
@@ -845,6 +953,14 @@ class MyWidget(QMainWindow):
             self.xSensorWidget.configureButton.setEnabled(False)
             self.xSensorWidget.configureButton.setStyleSheet('QPushButton {color: grey;}') 
 
+    def DelsysDefaultSettingsCheckedCallback(self):
+        if self.DefaultDelsysSensorsCheckBox.isChecked():
+            self.componentTracker['Default Delsys'] = True
+
+        else:
+            self.componentTracker.pop('Default Delsys')
+
+    
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     widget = MyWidget()

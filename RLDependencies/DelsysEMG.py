@@ -78,7 +78,8 @@ class DelsysEMG:
         self.sampleModeList = ['EMG plus gyro (+/- 2000 dps), +/-5.5mV, 20-450Hz',
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-5.5mV, 2-30Hz',
                                'EKG raw (2148 Hz), skin check (74 Hz), +/-11mv, 2-30Hz', 
-                               'SIG raw x4 (519Hz) (x1813)']
+                               'SIG raw x4 (519Hz) (x1813)',
+                               'SIG raw x4 (296Hz), ACC 16g (148Hz), GYRO 250dps (148Hz), Gain  x2221']
         
         # Data Saving File Structure
         self.dataSavingSensorDict = None
@@ -122,7 +123,7 @@ class DelsysEMG:
         """
         return self.status
     
-    def connectSensors(self, numSensors):
+    def connectSensors(self, numSensors, defaultAttachments = None):
         """
         Connects sensors to the Delsys EMG system.
 
@@ -132,94 +133,189 @@ class DelsysEMG:
         Sensors will quickly flash green when pairing is successful. Alternating 
         green and yellow flashing indicates waiting status.
         """
-    
-        print("Starting Sensor Pairing...")
-        print("Awaiting Sensor Pair Request...")
 
-        # Looping through num of sensors
-        for num in range(int(numSensors)):
-            # Calling Pairing Function
-            self.TrigBase.PairSensor()
-            # CheckPairStatus will be false when sensor is paired
-            while self.TrigBase.CheckPairStatus():
-                continue
+        if (defaultAttachments is not None):
+            print("Starting Sensor Pairing...")
+            print("Awaiting Sensor Pair Request...")
 
-            # Adding sensorNames and sensorNum to dict
+            # Looping through num of sensors
+            for num in range(int(numSensors)):
+                # Calling Pairing Function
+                self.TrigBase.PairSensor()
+                # CheckPairStatus will be false when sensor is paired
+                while self.TrigBase.CheckPairStatus():
+                    continue
+
+                # Adding sensorNames and sensorNum to dict
+                for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+                    tempSensorName = sensorName.split(" ")[0]
+                    if int(tempSensorName) in self.sensorDict.keys():
+                        # Updating Index
+                        self.sensorDict[int(tempSensorName)][0] = index
+                    else:
+                        self.sensorDict[int(tempSensorName)] = [index]
+
+                        # Asking user for input
+                        #sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
+                        #                                    prompt = f'Please indicate what muscle sensor {self.sensorNames.index(int(tempSensorName)) + 1} will be on.', parent=self.ROOT)
+                        sensorMuscle = defaultAttachments[num]
+                        self.sensorDict[int(tempSensorName)].append(sensorMuscle)
+
+                tempSensorKey = list(self.sensorDict.keys())
+
+                print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
+
+            # Required otherwise pipeline state doesn't update
+            self.TrigBase.ScanSensors()
             for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+                # Seeing what the actual order of adding sensors is
+                self.sensorsScannedOrder.append(sensorName)
+                sensorObject = self.TrigBase.GetSensorObject(index)
+                self.sensorsScannedOrderCheck.append(sensorObject.Properties.get_Sid())
+        
+            # Getting Number of Sensors
+            self.sensorsFound = len(self.sensorDict.keys())
+            
+            print("------Sensor List-----")
+            # Printing Num of Sensors and Sensor List
+            print(f"Sensors Found: {self.sensorsFound}")
+            [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
+
+            # Updating Pipeline State
+            self.status = self.TrigBase.GetPipelineState()
+
+        else:
+            print("Starting Sensor Pairing...")
+            print("Awaiting Sensor Pair Request...")
+
+            # Looping through num of sensors
+            for num in range(int(numSensors)):
+                # Calling Pairing Function
+                self.TrigBase.PairSensor()
+                # CheckPairStatus will be false when sensor is paired
+                while self.TrigBase.CheckPairStatus():
+                    continue
+
+                # Adding sensorNames and sensorNum to dict
+                for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+                    tempSensorName = sensorName.split(" ")[0]
+                    if int(tempSensorName) in self.sensorDict.keys():
+                        # Updating Index
+                        self.sensorDict[int(tempSensorName)][0] = index
+                    else:
+                        self.sensorDict[int(tempSensorName)] = [index]
+
+                        # Asking user for input
+                        sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
+                                                            prompt = f'Please indicate what muscle sensor {self.sensorNames.index(int(tempSensorName)) + 1} will be on.', parent=self.ROOT)
+                        #sensorMuscle = defaultAttachments[num]
+                        self.sensorDict[int(tempSensorName)].append(sensorMuscle)
+
+                tempSensorKey = list(self.sensorDict.keys())
+
+                print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
+
+            # Required otherwise pipeline state doesn't update
+            self.TrigBase.ScanSensors()
+            for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+                # Seeing what the actual order of adding sensors is
+                self.sensorsScannedOrder.append(sensorName)
+                sensorObject = self.TrigBase.GetSensorObject(index)
+                self.sensorsScannedOrderCheck.append(sensorObject.Properties.get_Sid())
+        
+            # Getting Number of Sensors
+            self.sensorsFound = len(self.sensorDict.keys())
+            
+            print("------Sensor List-----")
+            # Printing Num of Sensors and Sensor List
+            print(f"Sensors Found: {self.sensorsFound}")
+            [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
+
+            # Updating Pipeline State
+            self.status = self.TrigBase.GetPipelineState()
+
+    def scanForSensors(self, defaultAttachments = None):
+        # Scanning for Paired Sensors with default settings
+        if (defaultAttachments is not None):
+            print("Scanning for paired sensors...")
+            """Callback to tell the base to scan for any available sensors"""
+            try:
+                f = self.TrigBase.ScanSensors().Result
+            except Exception as e:
+                print("Scan failed")
+                #time.sleep(1)
+                self.scanForSensors()
+
+            # Iterating Along Current Sensor Names
+            for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+                # Seeing what the actual order of adding sensors is
+                self.sensorsScannedOrder.append(sensorName)
+
                 tempSensorName = sensorName.split(" ")[0]
                 if int(tempSensorName) in self.sensorDict.keys():
-                    # Updating Index
-                    self.sensorDict[int(tempSensorName)][0] = index
+                    continue
+                else:
+                    self.sensorDict[int(tempSensorName)] = [index]
+
+                    # Asking user for input
+                    #sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
+                    #                                        prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
+                    sensorNameIndex = self.sensorNames.index(int(tempSensorName))
+                    print(sensorNameIndex)
+                    sensorMuscle = defaultAttachments[sensorNameIndex]
+                    self.sensorDict[int(tempSensorName)].append(sensorMuscle)
+
+            print(self.sensorsScannedOrder)
+
+            # Getting Number of Sensors
+            self.sensorsFound = len(self.sensorDict.keys())
+            
+            print("------Sensor List-----")
+            # Printing Num of Sensors and Sensor List
+            print(f"Sensors Found: {self.sensorsFound}")
+            [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
+
+            # Updating Pipeline State
+            self.status = self.TrigBase.GetPipelineState()     
+
+        else:
+            print("Scanning for paired sensors...")
+            """Callback to tell the base to scan for any available sensors"""
+            try:
+                f = self.TrigBase.ScanSensors().Result
+            except Exception as e:
+                print("Scan failed")
+                #time.sleep(1)
+                self.scanForSensors()
+
+            # Iterating Along Current Sensor Names
+            for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
+                # Seeing what the actual order of adding sensors is
+                self.sensorsScannedOrder.append(sensorName)
+
+                tempSensorName = sensorName.split(" ")[0]
+                if int(tempSensorName) in self.sensorDict.keys():
+                    continue
                 else:
                     self.sensorDict[int(tempSensorName)] = [index]
 
                     # Asking user for input
                     sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                                                          prompt = f'Please indicate what muscle sensor {self.sensorNames.index(int(tempSensorName)) + 1} will be on.', parent=self.ROOT)
+                                                            prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
-            tempSensorKey = list(self.sensorDict.keys())
+            print(self.sensorsScannedOrder)
 
-            print(f"Sensor {self.sensorNames.index(tempSensorKey[num]) + 1} paired")
+            # Getting Number of Sensors
+            self.sensorsFound = len(self.sensorDict.keys())
+            
+            print("------Sensor List-----")
+            # Printing Num of Sensors and Sensor List
+            print(f"Sensors Found: {self.sensorsFound}")
+            [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
 
-        # Required otherwise pipeline state doesn't update
-        self.TrigBase.ScanSensors()
-        for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
-            # Seeing what the actual order of adding sensors is
-            self.sensorsScannedOrder.append(sensorName)
-            sensorObject = self.TrigBase.GetSensorObject(index)
-            self.sensorsScannedOrderCheck.append(sensorObject.Properties.get_Sid())
-    
-        # Getting Number of Sensors
-        self.sensorsFound = len(self.sensorDict.keys())
-        
-        print("------Sensor List-----")
-        # Printing Num of Sensors and Sensor List
-        print(f"Sensors Found: {self.sensorsFound}")
-        [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
-
-        # Updating Pipeline State
-        self.status = self.TrigBase.GetPipelineState()
-
-    def scanForSensors(self):
-        # Scanning for Paired Sensors
-        print("Scanning for paired sensors...")
-        """Callback to tell the base to scan for any available sensors"""
-        try:
-            f = self.TrigBase.ScanSensors().Result
-        except Exception as e:
-            print("Scan failed")
-            #time.sleep(1)
-            self.scanForSensors()
-
-        # Iterating Along Current Sensor Names
-        for index, sensorName in enumerate(self.TrigBase.GetSensorNames()):
-            # Seeing what the actual order of adding sensors is
-            self.sensorsScannedOrder.append(sensorName)
-
-            tempSensorName = sensorName.split(" ")[0]
-            if int(tempSensorName) in self.sensorDict.keys():
-                continue
-            else:
-                self.sensorDict[int(tempSensorName)] = [index]
-
-                # Asking user for input
-                sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                                                        prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
-                self.sensorDict[int(tempSensorName)].append(sensorMuscle)
-
-        print(self.sensorsScannedOrder)
-
-        # Getting Number of Sensors
-        self.sensorsFound = len(self.sensorDict.keys())
-        
-        print("------Sensor List-----")
-        # Printing Num of Sensors and Sensor List
-        print(f"Sensors Found: {self.sensorsFound}")
-        [print(str(sensor) + ': ' + self.sensorDict[sensor][1]) for sensor in self.sensorDict.keys()]
-
-        # Updating Pipeline State
-        self.status = self.TrigBase.GetPipelineState()        
+            # Updating Pipeline State
+            self.status = self.TrigBase.GetPipelineState()      
 
     def pairSensors(self, numSensors):
         self.connectSensors(numSensors)
