@@ -1,19 +1,26 @@
 import numpy as np
 from SelectiveKanervaCoding import *
 
-class TOTD(SelectiveKanervaCoding):
+class TOTD():
     """
     This is the Reinforcement Learning algorithm True Online Temporal Different Learning (Lambda) implemented
     with Selective Kanerva Coding used to create state representations of sensor signals.
+
+    Parameters:
+    - studyID: The study ID that will pull from SKC prototypes. Default: None.
+    - numStates: The number of inputs that are accepted by TOTD: Default: 0.
+    - alpha: The learning rate for TOTD. Default: 0.001.
+    - gamma: The discount factor. Default: 0.9.
+    - lambd: Default: 0.5.
     """
-    def __init__(self, studyID = None, numStates = 0, alpha = 0.001, gamma = 0.9, lambd = 0.5):
+    def __init__(self, studyID = None, numStates = 0, alpha = 0.001, gammas = [0.9, 0.71, 0.75], lambd = 0.9):
         # SelectiveKanervaCoding
         self.SKC = SelectiveKanervaCoding(studyID = studyID, numInputs = numStates)
 
         # [TODO: add initialization for S]
         # Initializing params
         self.alpha = alpha
-        self.gamma = gamma
+        self.gammas = gammas
         self.lambd = lambd
 
         self.numStates = numStates
@@ -25,6 +32,16 @@ class TOTD(SelectiveKanervaCoding):
     #-----------------------------------------------------------------------------------
     # ---- TOTD Update Algorithm
 
+    def setState(self, newState):
+        """
+        Setting new state for TOTD update.
+
+        Parameters:
+        - newState: List of information about the new state. Should have the same length as numInputs.
+        """
+        # Setting New Input State
+        self.newState = newState
+
     def update(self, newState, reward):
         # Inputting new state
         self.newState = newState
@@ -32,7 +49,7 @@ class TOTD(SelectiveKanervaCoding):
         self.Z = reward
 
         # Computing Feature Vector from SKC
-        self.xPrime = self.computeSKC(self.newState)
+        self.xPrime = self.SKC.computeSKC(self.newState)
 
         # Computing general value function
         self.V = self.weights.T * self.x

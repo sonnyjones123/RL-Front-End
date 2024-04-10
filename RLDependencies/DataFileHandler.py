@@ -17,7 +17,11 @@ class DataFileHandler():
         self.filePath = filePath
 
         # Initiating num channels
-        self.numChannels = 0        
+        self.numChannels = 0
+
+        # Initializing File Saving Structures
+        self.DelsysFileStructure = None
+        self.XSensorFileStructure = None        
 
     #-----------------------------------------------------------------------------------
     # ---- File Handler Functions
@@ -71,7 +75,7 @@ class DataFileHandler():
             self.hdf5File.attrs['Sensors'] = list(sensorDictXSensor.keys())
 
             # Formatting File for XSensor Data
-            self.formatDelsysInfo(sensorDictXSensor)
+            self.formatXsensorInfo(sensorDictXSensor)
 
         else:
             print("No Formatting Data Provided")
@@ -126,7 +130,7 @@ class DataFileHandler():
                 # Creating datasets for each channel
                 for i in range(len(datasets['Channels'])):
                     print(datasets['Channels'][i])
-                    self.createChannel(group, datasets['Channels'][i], {'SampleRate' : datasets['SampleRates'][i]})
+                    self.createXSensorChannel(group, datasets['Channels'][i], {'SampleRate' : datasets['SampleRates'][i]})
 
             except Exception as e:
                 print("Error in making group or datasets for XSensor.")
@@ -193,6 +197,32 @@ class DataFileHandler():
             # Adding to channel number
             self.numChannels += 1
 
+    """
+    Creating XSensor Channel
+    """
+    def createXSensorChannel(self, groupName: str, channelName: str, metaData: dict = None) -> None:
+        # Locating Group in file
+        try:
+            # Accessing group in file
+            group = self.hdf5File[groupName]
+            # Adding dataset to group
+            maxDataSize = (None, 341)
+
+            group.create_dataset(channelName, shape = (0, 341), maxshape = maxDataSize)
+
+            # Adding metadata if available
+            if metaData is not None:
+                # Adding metadata
+                for key, value in metaData.items():
+                    group[channelName].attrs[key] = value
+
+            # Adding to channel number
+            self.numChannels += 1
+
+        except Exception as e:
+            print(e)
+            print("Unable to format XSensor Channel")
+
     def openFile(self, fileName):
         # Opens file if not already open
         if self.hdf5File == None:
@@ -258,10 +288,10 @@ class DataFileHandler():
                         dataset = self.hdf5File[f'{sensor}/{channel}']
                         # Getting current data from xsensor, saving full array for now
                         currentLength = dataset.shape[0]
-                        dataset.resize(currentLength + len(data[index]), axis = 0)
+                        dataset.resize(currentLength + 1, axis = 0)
 
                         # Setting new data
-                        dataset[currentLength:currentLength + len(data[index])] = data[index]
+                        dataset[currentLength] = data[index]
 
                     except Exception as e:
                         print(e)

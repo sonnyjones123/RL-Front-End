@@ -768,7 +768,7 @@ class MyWidget(QMainWindow):
                 self.DataFileHandler.createFile(self.trialEntry.currentText())
 
                 # Formatting File
-                self.DataFileHandler.formatFile(self.DelsysEMG.dataSavingSensorDict, self.xSensorWidget.XSensorForce.dataSavingSensorDict)
+                self.DataFileHandler.formatFile(sensorDictDelsys = self.DelsysEMG.dataSavingSensorDict, sensorDictXSensor = self.xSensorWidget.XSensorForce.dataSavingSensorDict)
 
                 # Updating Close Data File Button
                 self.closeDataFileButton.setEnabled(True)
@@ -897,7 +897,11 @@ class MyWidget(QMainWindow):
     # Stop Data Collection Callback
     def stopDataCollectionCallback(self):
         # Stopping Data Collection
-        self.DelsysEMG.stopDataCollection()
+        try:
+            self.DelsysEMG.stopDataCollection()
+        except: 
+            print("Can't Stop Delsys Data Collection")
+
         self.videoCapture.recording = False
         self.recording = False
 

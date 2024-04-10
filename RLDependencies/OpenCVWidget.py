@@ -42,8 +42,8 @@ class VideoWidget(QWidget):
         
         # Setting OpenCV Capture Parameters
         self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         # self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.frameRate = 33
         self.frameDelay = 1000 // self.frameRate
@@ -161,18 +161,20 @@ class VideoWidget(QWidget):
         # Reading Frame
         ret, self.frame = self.cap.read()
         if ret:
+            # Resizing Frame
+            displayFrame = cv2.resize(self.frame, (720, 480))
             # Updating Frame on successful read
-            height, width, channel = self.frame.shape
+            height, width, channel = displayFrame.shape
             bytesPerLine = 3 * width
-            qImage = QImage(self.frame.data, width, height, bytesPerLine, QImage.Format_RGB888).rgbSwapped()
+            qImage = QImage(displayFrame.data, width, height, bytesPerLine, QImage.Format_RGB888).rgbSwapped()
             pixmap = QPixmap.fromImage(qImage)
             self.videoLabel.setPixmap(pixmap)
 
     # Frame Saving Function
     def saveFrame(self):
         if self.recording:
-            resizedFrame = cv2.resize(self.frame, (self.outputWidth, self.outputHeight))
-            self.videoWriter.write(resizedFrame)
+            # resizedFrame = cv2.resize(self.frame, (self.outputWidth, self.outputHeight))
+            self.videoWriter.write(self.frame)
 
     # Saving AUdio
     def saveAudio(self):
