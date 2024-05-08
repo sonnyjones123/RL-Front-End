@@ -88,7 +88,7 @@ class XSensorWidget(QWidget):
     def XSensorDisplay(self, sensor):
         SensorDisplayPanel = QWidget()
         SensorDisplayLayout = QVBoxLayout()
-        # SensorDisplayPanel.setFixedSize(500, 500)
+        SensorDisplayPanel.setFixedSize(220, 620)
 
         # Sensor Display Label
         self.sensorDisplayLabel = QLabel(f"<b>Insole {sensor + 1}</b>", alignment = Qt.AlignCenter)
@@ -109,6 +109,7 @@ class XSensorWidget(QWidget):
                 sensorWidget.setAutoFillBackground(True)
                 sensorWidget.setStyleSheet("background-color: black;")
                 sensorWidget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                sensorWidget.setMaximumSize(20, 20)
                 sensorWidget.setMinimumSize(20, 20)
                 sensorGridLayout.addWidget(sensorWidget, i, j)
                 rowLabels.append(sensorWidget)

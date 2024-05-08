@@ -31,7 +31,7 @@ class XSensorForce:
         XSensorForce = XSensorForce()
     
     """
-    def __init__(self, recordingRate = 10, enableIMU = False, allowX4 = True, wirelessX4 = True):
+    def __init__(self, recordingRate = 100, enableIMU = False, allowX4 = True, wirelessX4 = True):
         """
         XSensors default to wireless communication.
         """

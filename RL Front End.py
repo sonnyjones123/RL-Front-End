@@ -23,6 +23,7 @@ from RLDependencies.OpenCVWidget import *
 from RLDependencies.XSensorWidget import *
 from RLDependencies.DataFileHandler import *
 from RLDependencies.NoteTakingWidget import *
+from RLDependencies.TOTDWidget import *
 from RLDependencies.AudioVideoMuxing import combineAudioVideo
 
 class MyWidget(QMainWindow):
@@ -52,12 +53,16 @@ class MyWidget(QMainWindow):
         # Component Control
         controlAndNotes = QVBoxLayout()
         self.componentControl = self.componentController()
-        controlAndNotes.addWidget(self.componentControl)
+        controlAndNotes.addWidget(self.componentControl, alignment = Qt.AlignTop)
 
         # Note Taker
         self.noteTaker = NoteTakerWidget(self.saveLocation)
         controlAndNotes.addWidget(self.noteTaker)
         layout.addLayout(controlAndNotes)
+
+        # ML Controller
+        self.MLControl = TOTDWidget()
+        layout.addWidget(self.MLControl, alignment = Qt.AlignTop)
 
         # Delsys EMG
         self.DelsysEMG = DelsysEMG() 
@@ -111,17 +116,15 @@ class MyWidget(QMainWindow):
 
         # Creating Label for Components
         controllerPanel = QWidget()
-        controllerPanel.setFixedSize(300, 150)
+        controllerPanel.setFixedSize(50, 150)
         
         controllerLayout = QVBoxLayout()
         controllerLayout.setAlignment(Qt.AlignTop)
         
         # Components Label
-        #self.componentsLabel = QLabel("<b>Components</b>", alignment = Qt.AlignCenter)
         self.componentsLabel = QLabel("<b>Components</b>")
         self.componentsLabel.setStyleSheet('QLabel {color: black; font-size: 24px;}')
         controllerLayout.addWidget(self.componentsLabel)
-        
 
         # Delsys CheckBox
         self.delsysCheckBox = QCheckBox("Delsys (EMG, EKG)")
@@ -130,20 +133,19 @@ class MyWidget(QMainWindow):
         self.delsysCheckBox.stateChanged.connect(self.delsysCheckedCallback)
         controllerLayout.addWidget(self.delsysCheckBox)
         
-        
+        # Delsys Default Sensors CheckBox
+        self.DefaultDelsysSensorsCheckBox = QCheckBox("Default Delsys Sensors")
+        self.DefaultDelsysSensorsCheckBox.setStyleSheet('QCheckBox {color: black; padding: 15px;}')
+        self.DefaultDelsysSensorsCheckBox.setChecked(False)
+        self.DefaultDelsysSensorsCheckBox.stateChanged.connect(self.DelsysDefaultSettingsCheckedCallback)
+        controllerLayout.addWidget(self.DefaultDelsysSensorsCheckBox)
+
         # XSensor CheckBox
         self.XSensorCheckBox = QCheckBox("XSensor")
         self.XSensorCheckBox.setStyleSheet('QCheckBox {color: black;}')
         self.XSensorCheckBox.setChecked(False)
         self.XSensorCheckBox.stateChanged.connect(self.XSensorCheckedCallback)
         controllerLayout.addWidget(self.XSensorCheckBox)
-
-        # Delsys Default Sensors CheckBox
-        self.DefaultDelsysSensorsCheckBox = QCheckBox("Default Delsys Sensors")
-        self.DefaultDelsysSensorsCheckBox.setStyleSheet('QCheckBox {color: black;}')
-        self.DefaultDelsysSensorsCheckBox.setChecked(False)
-        self.DefaultDelsysSensorsCheckBox.stateChanged.connect(self.DelsysDefaultSettingsCheckedCallback)
-        controllerLayout.addWidget(self.DefaultDelsysSensorsCheckBox)
 
         # Adding to Panel
         controllerPanel.setLayout(controllerLayout)

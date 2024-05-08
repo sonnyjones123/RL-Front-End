@@ -84,7 +84,6 @@ class DataFileHandler():
     def formatDelsysInfo(self, sensorDictDelsys: dict) -> None:
         # Formatting file for the Delsys data structure
         for group, datasets in sensorDictDelsys.items():
-            print(group, datasets)
             # Setting internal attributes
             self.DelsysFileStructure = sensorDictDelsys
 
@@ -114,7 +113,6 @@ class DataFileHandler():
     def formatXsensorInfo(self, sensorDictXSensor: dict) -> None:
         # Formatting file for the XSensor data structure
         for group, datasets in sensorDictXSensor.items():
-            print(group, datasets)
             # Setting internal attributes
             self.XSensorFileStructure = sensorDictXSensor
 

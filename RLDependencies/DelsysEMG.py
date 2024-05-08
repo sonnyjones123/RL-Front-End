@@ -493,6 +493,9 @@ class DelsysEMG:
                     # Creating temp chanName and sampleRate lists
                     tempChanNameList = []
                     tempSampRateList = []
+                    channelSet = set()
+                    extra = 1
+
                     # Looping through num of channels in sensor sensorNum.
                     for channel in range(len(selectedSensor.TrignoChannels)):
                         # Updating Channel Count
@@ -500,10 +503,24 @@ class DelsysEMG:
 
                         # Grabbing Sensor Object and Appending Relevant Information
                         channelObject = selectedSensor.TrignoChannels[channel]
-                        self.channelNames.append(channelObject.Name)
+                        channelName = channelObject.Name
+                        self.channelNames.append(channelName)
                         self.sampleRates.append(channelObject.SampleRate)
                         self.samplesPerFrame.append(channelObject.SamplesPerFrame)
-                        tempChanNameList.append(channelObject.Name)
+
+                        # Checking if Channel Already Exists for Saving Purposes
+                        if channelName in channelSet:
+                            # Creating New Channel Name and Appending to List
+                            tempChannelName = f"{channelName}_{extra}"
+                            tempChanNameList.append(tempChannelName)
+                            extra += 1
+
+                        else:
+                            # Appending To Channel List
+                            tempChanNameList.append(channelName)
+                            channelSet.add(channelName)
+
+                        # Appending Channel Sample Rate to List
                         tempSampRateList.append(channelObject.SampleRate)
                         
                         # Adding Channel ID
@@ -532,29 +549,9 @@ class DelsysEMG:
             print("Pipeline not in armed state.")
 
         # Updating Pipeline State
-        self.status = self.TrigBase.GetPipelineState()
+        self.status = self.TrigBase.GetPipelineState()            
 
     def getData(self):
-        """
-        Checking data queue for incoming data packets. If there are data packets, will update 
-        our current data buffer with the incoming data packets.
-        """    
-        # Checking Data Queue
-        dataReady = self.TrigBase.CheckDataQueue()                      # Check if DelsysAPI real-time data queue is ready to retrieve
-        if dataReady:
-            DataOut = self.TrigBase.PollData()                          # Dictionary<Guid, List<double>> (key = Guid (Unique channel ID), value = List(Y) (Y = sample value)
-            outArr = [[] for i in range(len(DataOut.Keys))]             # Set output array size to the amount of channels being outputted from the DelsysAPI
-            keys = list(DataOut.Keys)                                   # Generate a list of all channel GUIDs in the dictionary
-            
-            for j in range(len(DataOut.Keys)):                          # loop all channels
-                outBuf = DataOut[keys[j]]                               # Index a single channels data from the dictionary based on unique channel GUID (key)
-                outArr[j].append(np.asarray(outBuf, dtype='object'))    # Create a NumPy array of the channel data and add to the output array
-            return outArr
-        else:
-            return None
-            
-
-    def GetData(self):
         """ Check if data ready from DelsysAPI via Aero CheckDataQueue() - Return True if data is ready
             Get data (PollData)
             Organize output channels by their GUID keys
@@ -583,8 +580,7 @@ class DelsysEMG:
         The checkData function outputs a System.Collections.Generic dictionary object. This function
         will clean up the data from the checkData function and output it into a Python dictionary.
         """
-        #outArr = self.getData()
-        outArr = self.GetData()
+        outArr = self.getData()
         if outArr is not None:
             try:
                 for i in range(len(outArr[0])):
