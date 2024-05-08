@@ -2,71 +2,157 @@ import numpy as np
 from SelectiveKanervaCoding import *
 
 class TOTD():
-    """
-    This is the Reinforcement Learning algorithm True Online Temporal Different Learning (Lambda) implemented
-    with Selective Kanerva Coding used to create state representations of sensor signals.
+    def __init__(self, studyID = None, numInputs = 3, alpha = 0.001, gammas = [0.9, 0.71, 0.75], lambda_ = 0.9):
+        """
+        This is the Reinforcement Learning algorithm True Online Temporal Different Learning (Lambda) implemented
+        with Selective Kanerva Coding used to create state representations of sensor signals.
 
-    Parameters:
-    - studyID: The study ID that will pull from SKC prototypes. Default: None.
-    - numStates: The number of inputs that are accepted by TOTD: Default: 0.
-    - alpha: The learning rate for TOTD. Default: 0.001.
-    - gamma: The discount factor. Default: 0.9.
-    - lambd: Default: 0.5.
-    """
-    def __init__(self, studyID = None, numStates = 0, alpha = 0.001, gammas = [0.9, 0.71, 0.75], lambd = 0.9):
+        Parameters:
+        - studyID: The study ID that will pull from SKC prototypes. Default: None.
+        - numInputs: The number of inputs that are accepted by TOTD: Default: 3.
+        - alpha: The learning rate for TOTD. Default: 0.001.
+        - gammas: The discount factor. Default: [0.9, 0.71, 0.75].
+        - lambd: Default: 0.9.
+        """
         # SelectiveKanervaCoding
-        self.SKC = SelectiveKanervaCoding(studyID = studyID, numInputs = numStates)
+        self.SKC = SelectiveKanervaCoding(studyID = studyID, numInputs = numInputs)
 
-        # [TODO: add initialization for S]
-        # Initializing params
+        # Getting Feature Length From SKC
+        self.featureLength = self.SKC.K * len(self.SKC.c)
+
+        # Initializing Learning Params
         self.alpha = alpha
-        self.gammas = gammas
-        self.lambd = lambd
+        self.gammas = np.array([gammas])
+        self.lambda_ = lambda_
 
-        self.numStates = numStates
-        self.weights = np.zeros(numStates)
-        self.eligibility = np.zeros(numStates)
-        self.VOld = np.zeros(numStates)
-        self.x = np.zeros(numStates * self.SKC.K)
+        # Loop Count
+        self.loopCount = 0
+
+        # Loading Previous Variables
+        self.loadOld = False
 
     #-----------------------------------------------------------------------------------
     # ---- TOTD Update Algorithm
 
-    def setState(self, newState):
+    # Variable Reset Function
+    def reset(self):
         """
-        Setting new state for TOTD update.
+        Resets variables for new learning trial.
+        """
+        # Resetting Variables After Learning Completion
+        self.featureVector = np.array(np.zeros(self.featureLength))
+        self.weights = np.array(np.zeros(self.featureLength))
+        self.VOld = np.array(np.zeros(self.featureLength))
+        self.eTrace = np.array(np.zeros(self.eTrace.shape))
+        self.loopCount = 0
+
+    # Changing Loading Variable Function
+    def setLoadOld(self, attribute):
+        """
+        Setting the variable that controls loading of previous variables.
+        """
+        # Setting Loading Variable to Attribute
+        self.loadOld = attribute
+
+    # Setting Params
+    def setParams(self, **kwargs):
+        """
+        Setting params for the base classifier.
 
         Parameters:
-        - newState: List of information about the new state. Should have the same length as numInputs.
+        - kwargs(dict): A dictionary of args to be set.
         """
-        # Setting New Input State
-        self.newState = newState
+        # Iterating Through Params
+        for key, value in kwargs.items():
+            # Setting Attribute
+            setattr(self, key, value)
 
-    def update(self, newState, reward):
-        # Inputting new state
-        self.newState = newState
-        self.SKC.setState(newState)
-        self.Z = reward
+        # Making Sure Gamma Is A List
+        if not isinstance(self.gammas, np.ndarray):
+            self.gammas = np.array([self.gammas])
 
+    # TOTD Update Function
+    def update(self, newState, Znew):
+        """
+        Performing TOTD Update
+
+        Parameters:
+        - newStates: The next input state for the update.
+        - ZNew: The cumulant signal for prediction.
+        """
         # Computing Feature Vector from SKC
-        self.xPrime = self.SKC.computeSKC(self.newState)
+        newFeatureVector = self.SKC.computeSKC(newState)
 
-        # Computing general value function
-        self.V = self.weights.T * self.x
-        self.VPrime = self.weights.T * self.xPrime
+        # If This is Initial Loop
+        if self.loopCount == 0:
+            # Loading In Old Learning Variables If Applicable
+            if self.loadOld is True:
+                self.featureVector = self.pastFeatureVector
+                self.weights = self.pastWeights
+                self.eTrace = self.pastETrace
+                self.VOld = self.pastVOld
+            
+            else:
+                # Initializing params
+                self.featureVector = np.array(np.zeros(self.featureLength))
+                try:
+                    # If ZNew is A N-Dimension Vector
+                    self.weights = np.array(np.zeros((Znew.shape[0], self.featureLength)))
+                    self.eTrace = np.array(np.zeros((Znew.shape[0], self.featureLength)))
+                    self.VOld = np.array(np.zeros(Znew.shape[0]))
 
-        # Computing TD error
-        self.tdError = self.Z + (self.gamma * self.VPrime) - self.V
+                    # Setting Output to None
+                    output = np.zeros(Znew.shape[0])
 
-        # Computing eligibility trace
-        self.eligibility = (self.gamma * self.lambd * self.eligibility) + self.x - (self.alpha * self.gamma * self.lambd * (self.eligibility.T * self.x) * self.x)
+                except:
+                    # If ZNew is A Scalar
+                    self.weights = np.array(np.zeros(self.featureLength))
+                    self.eTrace = np.array(np.zeros(self.featureLength))
+                    self.VOld = np.array([0])
+
+                    # Setting Output to None
+                    output = [0]
+
+        else:
+            # Computing general value function
+            V = np.dot(self.weights, self.featureVector.T)
+            VNew = np.dot(self.weights, newFeatureVector.T)
+
+            # Computing TD error
+            tdError = self.Z + self.gammas * VNew - V
+
+            # Computing eligibility trace
+            self.eTrace = (self.lambda_ * self.gammas.T * self.eTrace) + self.featureVector - (self.alpha * self.lambda_ * self.gammas * np.dot(self.featureVector, self.eTrace.T)).T * self.featureVector
+
+            # Updating weights
+            self.weights = self.weights + (self.alpha * (tdError + V - self.VOld)).T * self.eTrace - (self.alpha * np.array([(V - self.VOld)])).T * self.featureVector
+
+            # Resetting Old General Value Function Output
+            self.VOld = VNew
+
+            # Setting Output
+            output = VNew
+
+        # Setting Old Feature Vector and Cumulant
+        self.featureVector = newFeatureVector
+        self.Z = np.array([Znew])
+
+        # Updating Loop Count
+        self.loopCount += 1
         
-        # Updating weights
-        self.weights = self.weights + self.alpha * (self.tdError + self.V - self.VOld) * self.eligibility - self.alpha * (self.V - self.VOld) * self.x
+        # Returning Output
+        return output * (1 - self.gammas)
 
-        # Applying new variables
-        self.VOld = self.VPrime
-        self.x = self.xPrime
+    # Saving Old Weights and Eligibility Trace
+    def saveInfo(self):
+        """
+        This is a function designed to keep the old weights and eligibility trace in case learning
+        needs to start from a set point and not from old.
+        """
+        self.pastFeatureVector = self.featureVector
+        self.pastWeights = self.weights
+        self.pastETrace = self.eTrace
+        self.pastVOld = self.VOld
 
 if __name__ == '__main__':
     pass

@@ -37,9 +37,13 @@ class SelectiveKanervaCoding():
             # Looking for prototypes in path
             print("Loading prototypes if available...")
             w = os.listdir("../Algorithms/Prototypes")
-            if f"Prototypes_{studyID}.npy" in w:
+            prototypes = f"{studyID}_input{self.n}.npy"
+            
+            # Checking If Prototype Files are There
+            if prototypes in w:
                 self.P = np.load(f"../Algorithms/Prototypes/{studyID}_input{self.n}.npy", allow_pickle = False)
                 print("Prototypes loaded successfully")
+
             else:
                 print("No prototypes found")
                 print(f"Creating prototypes for {studyID}...")
@@ -47,7 +51,7 @@ class SelectiveKanervaCoding():
                 self.P = []
 
                 # Looping through number of prototypes
-                for i in range(self.K):
+                for _ in range(self.K):
                     self.P.append(np.random.rand(self.n))
 
                 # Saving initiaized prototypes list
@@ -57,22 +61,15 @@ class SelectiveKanervaCoding():
             print("Failed to load or create prototypes")
 
     #-----------------------------------------------------------------------------------
-    # ---- SKC Update Algorithm
-
-    def setState(self, newState):
-        """
-        Setting new state for SKC update. 
-
-        Parameters:
-        - newState: List of information about the new state. Should have the same length as numInputs.
-        """
-        # Inputting new state
-        self.newState = newState
+    # ---- SKC Update Algorithme
         
-    def computeSKC(self):
+    def computeSKC(self, newState):
         """
         Computing cList closest prototypes to the current state.
         """
+        # Setting New State
+        self.newState = newState
+
         # Resetting 
         D = np.zeros(self.K)
         # Looping Through Params
@@ -84,7 +81,7 @@ class SelectiveKanervaCoding():
         sortedIndex = np.argsort(D, kind = 'quicksort')
         
         # Setting Feature Vector
-        featureVector = np.zeros(self.K * 3)
+        featureVector = np.zeros(self.K * len(self.c))
 
         # Looping Through C List
         for index, m in enumerate(self.c):
@@ -93,18 +90,6 @@ class SelectiveKanervaCoding():
             featureVector[tempIndices] = 1
 
         return featureVector
-
-    # Updating Algorithm
-    def updateSKC(self, newState):
-        """
-        Setting new state for SKC update. 
-
-        Parameters:
-        - newState: List of information about the new state. Should have the same length as numInputs.
-        """
-        # SKC Update
-        self.setState(newState)
-        return self.computeSKC()
 
     #-----------------------------------------------------------------------------------
     # ---- Archived Functions
