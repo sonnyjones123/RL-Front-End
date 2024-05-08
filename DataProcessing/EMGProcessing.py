@@ -33,7 +33,9 @@ def movingAverage(signal, windowSize: int):
     # Returning MAV with windowSize
     return np.convolve(signal, np.ones(windowSize)/windowSize, mode = 'same')
 
+'''
 def MAV(signal, n: int):
     ret = np.cumsum(signal, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
+'''
