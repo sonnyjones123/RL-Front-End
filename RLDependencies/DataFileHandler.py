@@ -2,6 +2,14 @@ import numpy as np
 import h5py
 import os
 from datetime import datetime
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import tkinter as tk
+import json
+import threading
+import queue
+from pylsl import StreamInlet, resolve_stream
 
 class DataFileHandler():
     """
@@ -9,7 +17,7 @@ class DataFileHandler():
     numpy and h5py files formats to saving.
 
     Author: Sonny Jones & Grange Simpson
-    Version: 2024.01.17 
+    Version: 2024.06.10
     """
 
     def __init__(self, filePath = None):
@@ -26,6 +34,10 @@ class DataFileHandler():
     #-----------------------------------------------------------------------------------
     # ---- File Handler Functions
 
+    def setFilePath(self, filePath):
+        # Setting File Path
+        self.filePath = filePath
+
     def createFile(self, fileName):
         if self.filePath is not None:
             # Checking filePath 
@@ -34,6 +46,7 @@ class DataFileHandler():
                 os.makedirs(self.filePath)
 
             # Formatting FileName
+            self.trialName = fileName
             self.fileName = f"{fileName}.h5"
 
             # Complete path
@@ -234,6 +247,26 @@ class DataFileHandler():
         # Adding stop time as an attribute
         self.hdf5File.attrs['stopTime'] = stopTime
 
+    def addTransitionTime(self, terrain, transitionTime):
+        # Adding Transition Time to List in h5pyFile
+        if 'terrainTransition' in self.hdf5File.attrs.keys():
+            # Loading Current List
+            currentTerrainList = self.hdf5File.attrs['terrainTransition']
+            currentTransitionList = self.hdf5File.attrs['terrainTransitionTime']
+
+            # Appending Transition to List
+            currentTerrainList = np.append(currentTerrainList, terrain)
+            currentTransitionList = np.append(currentTransitionList, transitionTime)
+
+            # Saving Attribute
+            self.hdf5File.attrs['terrainTransition'] = currentTerrainList
+            self.hdf5File.attrs['terrainTransitionTime'] = currentTransitionList
+
+        else:
+            # Creating Attribute
+            self.hdf5File.attrs['terrainTransition'] = [terrain]
+            self.hdf5File.attrs['terrainTransitionTime'] = [transitionTime]
+
     def closeFile(self):
         # Checking to see if file exists
         if self.hdf5File is not None:
@@ -259,10 +292,12 @@ class DataFileHandler():
                             
                             # Getting current size and reindexing
                             currentLength = dataset.shape[0]
-                            dataset.resize(currentLength + len(data[0][index]), axis = 0)
+                            # dataset.resize(currentLength + len(data[0][index]), axis = 0)
+                            dataset.resize(currentLength + len(data[index]), axis = 0)
                             
                             # Setting new data
-                            dataset[currentLength:currentLength + len(data[0][index])] = list(data[0][index])
+                            # dataset[currentLength:currentLength + len(data[0][index])] = list(data[0][index])
+                            dataset[currentLength:currentLength + len(data[index])] = list(data[index])
 
                         except Exception as e:
                             print(e)
@@ -273,30 +308,26 @@ class DataFileHandler():
 
     def saveXSensorData(self, data):
         # Saving XSensor Data, since data structure is similar, but different
+        # Checking data length
         if len(data) == 0:
             pass
         else:
-            # Indexing param
-            index = 0
-
             # Looping through sensors
-            for sensor in list(self.XSensorFileStructure.keys()):
+            for sensorIndex, sensor in enumerate(list(self.XSensorFileStructure.keys())):
+                # Looping through Sensor Channels
                 for channel in self.XSensorFileStructure[sensor]['Channels']:
                     try:
                         dataset = self.hdf5File[f'{sensor}/{channel}']
                         # Getting current data from xsensor, saving full array for now
                         currentLength = dataset.shape[0]
-                        dataset.resize(currentLength + 1, axis = 0)
+                        dataset.resize(currentLength + len(data[sensorIndex]), axis = 0)
 
                         # Setting new data
-                        dataset[currentLength] = data[index]
+                        dataset[currentLength:currentLength + len(data[sensorIndex])] = data[sensorIndex]
 
                     except Exception as e:
                         print(e)
                         print(f"Unable to add data to {sensor} : {channel}")
-
-                    # Increment index
-                    index += 1
 
     def update(self, delsysData = None, XSensorData = None):
         # Updating information in file
@@ -304,6 +335,40 @@ class DataFileHandler():
             self.saveDelsysData(delsysData)
         if XSensorData:
             self.saveXSensorData(XSensorData)
+
+    def plotTrialDataThread(self):
+        plotThread = threading.Thread(target = self.plotTrialData)
+        plotThread.start()
+
+        self.plotTrialData()
+
+    def plotTrialData(self):
+        # Visualization for Trial Data
+        # Looping Through Delsys Sensors
+        for sensor in list(self.DelsysFileStructure.keys()):
+            # Checking if Sensor in Name
+            if ("Sensor" in sensor):
+                # Creating Subplot for Data
+                channelLength = len(self.DelsysFileStructure[sensor]['Channels'])
+                fig, ax = plt.subplots(channelLength, figsize=(channelLength * 2.5, 10))
+
+                # Iterating Through All Channels
+                for index, channel in enumerate(self.DelsysFileStructure[sensor]['Channels']):
+                    try:                  
+                        # Getting Data From Sensor/Channel
+                        dataset = self.hdf5File[f'{sensor}/{channel}'][()]
+
+                        # Plotting on Axes With Appropriate Labelings
+                        ax[index].plot(dataset, label = channel)
+                        ax[index].legend(loc = 'upper right')
+                        plt.suptitle(f"{sensor} - {self.trialName}")
+                        plt.show(block = False)
+                    except:
+                        pass
+
+    def saveDelsysMVC(self, MVCData):
+        # Saving Data As NP File
+        np.save(f"{self.filePath}/MVC.npy", MVCData, allow_pickle = True)
 
     #-----------------------------------------------------------------------------------
     # ---- Archived
@@ -347,3 +412,151 @@ class DataFileHandler():
             # Adding metadata
             for key, value in dictMetaData.items():
                 dataset.attrs[key] = value
+
+#-----------------------------------------------------------------------------------
+# ---- Queue Class
+
+class Queue(queue.Queue):
+    "Custom Queue subclass with clearning method."
+
+    def clear(self):
+        """
+        Clears all items from the queue.
+        """
+        try:
+            with self.mutex:
+                # Getting Unfinished Tasks
+                unfinished = self.unfinished_tasks - len(self.queue)
+
+                # Checking Unfinished Tasks
+                if unfinished <= 0:
+                    if unfinished < 0:
+                        raise ValueError('task_done() called too many times')
+                    
+                    # Notifying All Tasks Completed
+                    self.all_tasks_done.notify_all()
+
+                # Setting Unfinished Tasks
+                self.unfinished_tasks = unfinished
+                
+                # Clearing Queue
+                self.queue.clear()
+
+                # Notifying All Tasks
+                self.not_full.notify_all()
+
+        except Exception as e:
+            print(f"Error clearing queue: {e}")
+
+#-----------------------------------------------------------------------------------
+# ---- Threading Module For Commands and Saving
+
+# Setting Up DataFileHandler
+dataHandler = DataFileHandler()
+
+# Setting up Command Queue
+commandQueue = Queue()
+
+# Stopping Event
+stopEvent = threading.Event()
+
+# Command Mapp
+commandMap = {
+    'setFilePath' : dataHandler.setFilePath,
+    'createFile' : dataHandler.createFile,
+    'formatFile' : dataHandler.formatFile,
+    'addStartTime' : dataHandler.addStartTime,
+    'addStopTime' : dataHandler.addStopTime,
+    'saveDelsysData' : dataHandler.saveDelsysData,
+    'saveXSensorData' : dataHandler.saveXSensorData,
+    'saveDelsysMVC' : dataHandler.saveDelsysMVC,
+    'addTransitionTime' : dataHandler.addTransitionTime,
+    'plotTrialData' : dataHandler.plotTrialDataThread,
+    'closeFile' : dataHandler.closeFile,
+    'stop' : stopEvent.set
+}
+
+# Listener Function for Commands
+def listener():
+    # Resolving Command Stream
+    print("Looking for RLCommandStream...")
+    
+    try:
+        # Creating a New Inlet to Read from the Stream
+        streams = resolve_stream('type', 'command')
+
+        # If No Stream
+        if len(streams) == 0:
+            print("Stream not found")
+
+        # If Stream Found
+        else:
+            # Creating Inlet
+            inlet = StreamInlet(streams[0])
+
+            # Infinite Loop for Listening
+            while not stopEvent.is_set():
+                try:
+                    # Getting New Command From Command Stream
+                    command, timestamps = inlet.pull_sample()
+
+                    # If Command is Available
+                    if command:
+                        # Adding Command to Queue
+                        commandQueue.put(json.loads(command[0]))
+
+                # Decoding Error
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding sample: {e}")
+
+                # Connection Timeout Error
+                except TimeoutError:
+                    print("Stream connection lost. Exiting listener thread.")
+                    stopEvent.set()
+                    break
+
+    # Error Setting Up Listener
+    except Exception as e:
+        print(f"Error setting up listener: {e}")
+
+# Queue Processor Function
+def processQueue():
+    # Infinite Loop for Processing
+    while not stopEvent.is_set():
+        # Getting Command from Command Queue
+        command = commandQueue.get()
+
+        # If There Are Commands in Queue
+        if command is not None:
+            try:
+                # Getting Command, Params
+                functionName = command['function']
+                params = command.get('params', {})
+
+                # Executing Commands
+                commandMap[functionName](**params)
+
+                # Clearing Queue If Command is Close File
+                if functionName == 'closeFile':
+                    commandQueue.clear()
+
+            except:
+                print(f"Error executing command: {functionName}")
+
+#-----------------------------------------------------------------------------------
+# ---- Main Function
+
+if __name__ == '__main__':
+    # Creating and Running Listener Thread
+    listenerThread = threading.Thread(target = listener, daemon = True)
+    listenerThread.start()
+
+    # Creating and Running Processor Thread
+    processerThread = threading.Thread(target = processQueue, daemon = True)
+    processerThread.start()
+
+    # Keeping Main Thread Alive
+    while not stopEvent.is_set():
+        pass
+
+    print("Exiting DataFileHandler...")

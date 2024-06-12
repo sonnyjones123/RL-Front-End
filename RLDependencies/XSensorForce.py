@@ -31,7 +31,7 @@ class XSensorForce:
         XSensorForce = XSensorForce()
     
     """
-    def __init__(self, recordingRate = 100, enableIMU = False, allowX4 = True, wirelessX4 = True):
+    def __init__(self, recordingRate = 100, enableIMU = False, allowX4 = True, wirelessX4 = True, cache = False):
         """
         XSensors default to wireless communication.
         """
@@ -40,7 +40,7 @@ class XSensorForce:
         self.xscore.XS_InitLibrary()
 
         # Buffers
-        self.dataBuffer = []
+        self.data = []
         self.frameNumber = 0
 
         # pre-define some variables to hold data from the DLL.
@@ -100,6 +100,7 @@ class XSensorForce:
 
         # Configuration status
         self.connected = False
+        self.cache = cache
 
         # Data Saving File Structure
         self.dataSavingSensorDict = None
@@ -230,16 +231,21 @@ class XSensorForce:
             sMesg = '\tMin pressure {:0.4f} '.format(float(self.minPressureRange.value)) + self.sPressureUnits + ' Max pressure {:0.4f} '.format(float(self.maxPressureRange.value)) + self.sPressureUnits
             print (sMesg)
 
-            exec(f"self.dataBuffer{self.sensorIndex} = []")
-
-            # Creating dataBuffer object
-            self.dataBuffer.append([np.zeros(self.senselRows.value * self.senselColumns.value)])
-            
+            # Increasing Sensor Index
             self.sensorIndex = self.sensorIndex + 1
+
+        # Configuring Cache
+        if self.cache:
+            # Setting Cache Samples
+            self.xscore.XS_SetCacheSamples(True)
+
+            # Making Sure Cache is Set
+            if (self.xscore.XS_IsCacheSamples() == True):
+                print("Cache Samples Successfully Set")
             
     def connect(self):
         # Initiating Connection
-        if (self.xscore.XS_OpenConfig() == True) and (self.xscore.XS_StartRecord(self.targetRateHz) == True):
+        if (self.xscore.XS_OpenConfig() == True):
             self.connected = True
             print('XSensor Connection Established')
 
@@ -253,60 +259,118 @@ class XSensorForce:
             print("XSensor Connection Failed")
             return False
 
+    def startDataCollection(self):
+        """
+        Starting data colleciton.
+        """
+        # Starting Data Recording
+        try:
+            if (self.xscore.XS_StartRecord(self.targetRateHz) == True):
+                print("XSensor Data Collection Started")
+            else:
+                print("XSensor Data Collection Unable to Start")
+        except Exception as e:
+            print("XSensor Data Collection Starting Error")
+            print(e)
+
     def processData(self):
         """
-        Data processing function for XSensor. Needs to be called from a loop, each call is one frame. 
+        Data processing function for XSensor. Needs to be called from a loop, each call is one frame. If self.cache is true, this function 
+        will process the data buffer on the XSensors and read all available frames.
         """
+        # Creaing Data Output
+        outArr = [[] for _ in range(self.numSensors)]
+
         # Checking connection
-        if (self.connected == True):
-            # Checking If Sample is Available
-            if self.xscore.XS_Sample() == True:
-                # Checking Timestamp of Last Sample
-                try:
-                    self.xscore.XS_GetSampleTimeUTC(ctypes.byref(self.sampleYear), ctypes.byref(self.sampleMonth), ctypes.byref(self.sampleDay), ctypes.byref(self.sampleHour), ctypes.byref(self.sampleMinute), ctypes.byref(self.sampleSecond), ctypes.byref(self.sampleMillisecond), ctypes.byref(self.sampleMicrosecond), self.localTime)
-                except:
-                    pass
+        if (self.xscore.XS_IsRecording()):
+            # Checking Cache
+            if (self.xscore.XS_IsCacheSamples()):
+                # Looping Until Buffer is Gone
+                while True:
+                    # Checking If Sample is Available
+                    if self.xscore.XS_Sample() == True:
+                        # Checking Timestamp of Last Sample
+                        try:
+                            self.xscore.XS_GetSampleTimeUTC(ctypes.byref(self.sampleYear), ctypes.byref(self.sampleMonth), ctypes.byref(self.sampleDay), ctypes.byref(self.sampleHour), ctypes.byref(self.sampleMinute), ctypes.byref(self.sampleSecond), ctypes.byref(self.sampleMillisecond), ctypes.byref(self.sampleMicrosecond), self.localTime)
+                        except:
+                            pass
+                        
+                        # Checking time sample against last time sample
+                        if ((self.sampleMinute.value == self.prevsampleMinute.value) and (self.sampleSecond.value == self.prevsampleSecond.value) and (self.sampleMillisecond.value == self.prevsampleMillisecond.value)):
+                            pass
+                        
+                        self.prevsampleMinute.value = self.sampleMinute.value
+                        self.prevsampleSecond.value = self.sampleSecond.value
+                        self.prevsampleMillisecond.value = self.sampleMillisecond.value
 
-                # Checking time sample against last time sample
-                if ((self.sampleMinute.value == self.prevsampleMinute.value) and (self.sampleSecond.value == self.prevsampleSecond.value) and (self.sampleMillisecond.value == self.prevsampleMillisecond.value)):
-                    return
-                
-                self.prevsampleMinute.value = self.sampleMinute.value
-                self.prevsampleSecond.value = self.sampleSecond.value
-                self.prevsampleMillisecond.value = self.sampleMillisecond.value
-        
-            # Going through Frames
-            for sensor in range(self.numSensors):
-                # Fetching Sensor ID
-                sensorPID = self.xscore.XS_ConfigSensorPID(sensor)
-                # need the sensor dimensions to pre-allocate some buffer space
-                self.xscore.XS_SensorDimensions(sensorPID, ctypes.byref(self.senselRows), ctypes.byref(self.senselColumns))
-                # Constructing Buffer
-                frameBuffer = (ctypes.c_float*(self.senselRows.value*self.senselColumns.value))()
+                        # Going through Frames
+                        for sensor in range(self.numSensors):
+                            # Fetching Sensor ID
+                            sensorPID = self.xscore.XS_ConfigSensorPID(sensor)
+                            # need the sensor dimensions to pre-allocate some buffer space
+                            self.xscore.XS_SensorDimensions(sensorPID, ctypes.byref(self.senselRows), ctypes.byref(self.senselColumns))
+                            # Constructing Buffer
+                            frameBuffer = (ctypes.c_float*(self.senselRows.value*self.senselColumns.value))()
 
-                # Retrieving Frame
-                if self.xscore.XS_GetPressure(sensorPID, ctypes.byref(frameBuffer)) == 1:
-                    # Dump Frame
-                    self.dataBuffer[sensor] = frameBuffer      
+                            # Retrieving Frame
+                            if self.xscore.XS_GetPressure(sensorPID, ctypes.byref(frameBuffer)) == 1:
+                                # Dump Frame
+                                outArr[sensor].append(list(frameBuffer))
+                                
+                    # No Sample, Breaking While Loop
+                    else:
+                        if self.xscore.XS_GetLastErrorCode() == 21: # Error Code for XS_Sample() not called or no sample available
+                            break
+                            
+            else:
+                # Checking If Sample is Available
+                if self.xscore.XS_Sample() == True:
+                    # Going through Frames
+                    for sensor in range(self.numSensors):
+                        # Fetching Sensor ID
+                        sensorPID = self.xscore.XS_ConfigSensorPID(sensor)
+                        # need the sensor dimensions to pre-allocate some buffer space
+                        self.xscore.XS_SensorDimensions(sensorPID, ctypes.byref(self.senselRows), ctypes.byref(self.senselColumns))
+                        # Constructing Buffer
+                        frameBuffer = (ctypes.c_float*(self.senselRows.value*self.senselColumns.value))()
 
+                        # Retrieving Frame
+                        if self.xscore.XS_GetPressure(sensorPID, ctypes.byref(frameBuffer)) == 1:
+                            # Dump Frame
+                            outArr[sensor].append(list(frameBuffer))
+
+        # Setting dataBuffer
+        self.data = outArr
+    
     def stopDataCollection(self):
         """
         Stop data collection.
         """
-        #self.connected = False
+        try:
+            # Stopping Recording and Updating Recording Variable
+            if (self.xscore.XS_StopRecord() == True):
+                print("XSensor Recording Stopped")
+            else:
+                print("XSensor Recording Unable to be Stopped")
 
-        # Resetting Buffer
-        self.dataBuffer = []
-        exec(f"self.dataBuffer{self.sensorIndex} = []")
+        except Exception as e:
+            print("XSensor Data Collection Stopping Error")
+            print(e)
 
-        # Creating dataBuffer object
-        self.dataBuffer.append([np.zeros(self.senselRows.value * self.senselColumns.value)])
+        # Resetting dataBuffer object
+        self.data = []
+
+    def resetBuffer(self):
+        """
+        Clearing Data Buffer.
+        """
+        # Resetting dataBuffer object
+        self.data = []
 
     def releaseConfig(self):
         """
         Releasing XSensor Configuration
         """
-        self.xscore.XS_StopRecord()
         self.xscore.XS_CloseConfig()
         self.xscore.XS_ReleaseConfig()
 

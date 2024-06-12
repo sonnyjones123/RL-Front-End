@@ -1,5 +1,5 @@
 import sys
-import ctypes
+import numpy as np
 
 from PySide6.QtGui import *
 from PySide6.QtCore import *
@@ -24,10 +24,10 @@ class XSensorWidget(QWidget):
         sys.exit(app.exec())
 
     """
-    def __init__(self):
+    def __init__(self, recordingRate):
         super().__init__()
         self.XSensorStatus = "Idle"
-        self.XSensorForce = XSensorForce()
+        self.XSensorForce = XSensorForce(recordingRate = 1000//recordingRate)
         self.sensorsConnected = 0
         self.XSensorControlPanel = self.XSensorPanel()
         self.sensorDisplayTrack = []
@@ -36,7 +36,7 @@ class XSensorWidget(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.splitter)
         self.sensorData = []
-        self.frameDelay = 1000/self.XSensorForce.targetRateHz
+        self.frameDelay = recordingRate * 2
         self.ready = False
 
     #-----------------------------------------------------------------------------------
@@ -200,7 +200,10 @@ class XSensorWidget(QWidget):
     # Data Processing Callback
     def processDataCallback(self):
         self.XSensorForce.processData()
-        self.updateDisplay()
+
+    # Clearing Data Buffer
+    def resetBuffer(self):
+        self.XSensorForce.resetBuffer()
 
     # Stop Data Collection
     def stopDataCollection(self):
@@ -226,12 +229,41 @@ class XSensorWidget(QWidget):
     # Display Update Function
     def updateDisplay(self):
         try:
-            for sensor in range(self.XSensorForce.numSensors):
-                for row in range(self.numRows):
-                    for col in range(self.numCols):
-                        value = self.XSensorForce.dataBuffer[sensor][row * self.numCols + col]
-                        color = self.getColor(value)
-                        exec(f"self.sensorLabel{sensor}[row][col].setStyleSheet('background-color: {color.name()};')")
+            # Checking If Caching is Enabled
+            if self.XSensorForce.cache:
+                # Looping Through Number of Sensors
+                for sensor in range(self.XSensorForce.numSensors):
+                    # Looping Through Rows in Sensors
+                    for row in range(self.numRows):
+                        # Looping Through Cols in Sensors
+                        for col in range(self.numCols):
+                            # Creating List to Hold Values
+                            sensorValues = []
+
+                            # Looping Through Samples in Buffer
+                            for sample in self.XSensorForce.data[sensor]:
+                                # Appending Sample Sensor Row and Col Value
+                                # TODO: TEST THIS
+                                sensorValues.append(sample[row * self.numCols + col])
+
+                            # Creating and Setting Color
+                            color = self.getColor(np.average(value))
+                            exec(f"self.sensorLabel{sensor}[row][col].setStyleSheet('background-color: {color.name()};')")
+
+            # Not Caching Update
+            else:
+                # Looping Through Number of Sensors
+                for sensor in range(self.XSensorForce.numSensors):
+                    # Looping Through Rows in Sensors
+                    for row in range(self.numRows):
+                        # Looping Through Cols in Sensors
+                        for col in range(self.numCols):
+                            # Getting Value of Sensor From DataBuffer
+                            value = self.XSensorForce.data[sensor][0][row * self.numCols + col]
+
+                            # Creating and Setting Color
+                            color = self.getColor(value)
+                            exec(f"self.sensorLabel{sensor}[row][col].setStyleSheet('background-color: {color.name()};')")
         except Exception as e:
             print(e)
             print("Could not update XSensor display")

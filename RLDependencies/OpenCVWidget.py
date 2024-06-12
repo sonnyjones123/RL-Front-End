@@ -32,7 +32,7 @@ class VideoWidget(QWidget):
         sys.exit(app.exec())
 
     """
-    def __init__(self, filePath = None):
+    def __init__(self, filePath = None, recordingRate = 30):
         super().__init__()
 
         self.videoPanel = self.openCVPanel()
@@ -45,13 +45,9 @@ class VideoWidget(QWidget):
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         # self.cap.set(cv2.CAP_PROP_FPS, 30)
-        self.frameRate = 33
-        self.frameDelay = 1000 // self.frameRate
+        self.frameRate = 1000 // recordingRate # // 2
+        self.frameDelay = recordingRate # * 2
         self.videoWriter = None
-
-        # 720p resolution
-        # self.outputWidth = 1280
-        # self.outputHeight = 720
 
         # 1080p resolution
         self.outputWidth = 1920
@@ -143,7 +139,10 @@ class VideoWidget(QWidget):
                 customFileName = f"{fileName}.wav"
 
                 # Creating Complete Path
-                completePath = os.path.join(self.filePath, customFileName)
+                # Issue here, joining the paths incorrectly
+                #completePath = os.path.join(self.filePath, customFileName)
+                # TODO: os.path.join concatentates the paths incorrectly with a \\ instead of /
+                completePath = self.filePath + '/' + customFileName
 
                 # Creating Outlet
                 self.audioWriter = wave.open(completePath, 'wb')

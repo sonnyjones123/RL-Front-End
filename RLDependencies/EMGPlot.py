@@ -29,7 +29,8 @@ class EMGPlot(QWidget):
         self.sampleCount = 0
         self.plottingBuffer = np.zeros((self.numGraphs, self.bufferSize))
         self.plottingPanel = self.PlottingPanel()
-        self.updateTimer = 50
+        self.updateTimer = recordingRate * 2
+        self.frameDelay = recordingRate * 2
         self.recordingRate = recordingRate
         
     # Initializing Plotting Widget Panel
@@ -94,20 +95,30 @@ class EMGPlot(QWidget):
         self.samples[-1] = self.sampleCount
         
         # Performing Graph Update on Timer Setting
-        if self.updateTimer == 50:
+        if self.updateTimer >= self.frameDelay:
             self.plotItem.setData(self.samples, self.plottingBuffer[self.currentPlot])
             self.updateTimer = 0
-        else:
-            self.updateTimer += self.recordingRate
+        
+        # Upadting Plotting Timer
+        self.updateTimer += self.recordingRate
 
         self.plottingBuffer = np.roll(self.plottingBuffer, -1, axis = 1)
-        # self.plottingBuffer = np.roll(self.plottingBuffer, -lengthNewData, axis = 1)
 
     # Updating Current Plot
     def updateEMGPlot(self):
         # Updating Current Plot Index and Title
         self.currentPlot = self.sensorDisplayList.index(self.sensorDisplaySelection.currentText())
         self.plot.setTitle(self.sensorDisplaySelection.currentText())
+
+    # Resetting Plot
+    def resetPlot(self):
+        # Resetting Tracking Variables
+        self.samples = np.arange(-(self.bufferSize - 1), 1)
+        self.sampleCount = 0
+        self.plottingBuffer = np.zeros((self.numGraphs, self.bufferSize))
+
+        # Clearing Plot
+        self.plotItem.clear()
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)

@@ -3,8 +3,7 @@ import platform
 import numpy as np
 import clr
 import tkinter as tk
-import threading
-
+import matplotlib.pyplot as plt
 
 clr.AddReference("System.Collections")
 
@@ -67,8 +66,16 @@ class DelsysEMG:
         self.numSensorsConnected = 0
         self.status = "Off"
 
+        # Sensor Tracking
         self.sensorsScannedOrder = []
         self.sensorsScannedOrderCheck = []
+
+        # Normalization Information
+        self.normalize = False
+        self.normalizeDict = {}
+        self.normalizeList = []
+        self.trialNumber = 3
+        self.MVCRecording = False
 
         # Text Input Box
         self.ROOT = tk.Tk()
@@ -154,11 +161,7 @@ class DelsysEMG:
                         self.sensorDict[int(tempSensorName)][0] = index
                     else:
                         self.sensorDict[int(tempSensorName)] = [index]
-
-                        # Asking user for input
-                        #sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                        #                                    prompt = f'Please indicate what muscle sensor {self.sensorNames.index(int(tempSensorName)) + 1} will be on.', parent=self.ROOT)
-                        sensorMuscle = defaultAttachments[num]
+                        sensorMuscle = defaultAttachments[self.sensorNames.index(int(tempSensorName))]
                         self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
                 tempSensorKey = list(self.sensorDict.keys())
@@ -256,12 +259,7 @@ class DelsysEMG:
                     continue
                 else:
                     self.sensorDict[int(tempSensorName)] = [index]
-
-                    # Asking user for input
-                    #sensorMuscle = simpledialog.askstring(title = 'Sensor Muscle Input',
-                    #                                        prompt = 'Please indicate which muscle sensor ' + str(self.sensorNames.index(int(tempSensorName)) + 1) +' is on.', parent=self.ROOT)
                     sensorNameIndex = self.sensorNames.index(int(tempSensorName))
-                    print(sensorNameIndex)
                     sensorMuscle = defaultAttachments[sensorNameIndex]
                     self.sensorDict[int(tempSensorName)].append(sensorMuscle)
 
@@ -569,7 +567,7 @@ class DelsysEMG:
             for j in range(len(self.collectionOutputOrder)):
                 # Grabbing Data from Key and Appending to OurArr
                 chan_data = DataOut[self.collectionOutputOrder[j]]
-                outArr[j].append(np.asarray(chan_data, dtype = 'object'))
+                outArr[j].append(list(np.asarray(chan_data, dtype = 'object')))
 
             return outArr
         else:
@@ -635,7 +633,7 @@ class DelsysEMG:
                         avg_data = np.average(self.data[0][i])
                         averageEMG.append(avg_data)
             else:
-                averageEMG.append(np.zeros(self.sensorsFound))
+                averageEMG.append(np.zeros(self.numEMGChannels))
 
         except Exception as e:
             print(e)
@@ -663,8 +661,7 @@ class DelsysEMG:
                         avg_data = np.average(self.data[0][i])
                         averageEMG.append(avg_data)
             else:
-                averageEMG = np.zeros(self.sensorsFound)
-                pass
+                averageEMG = np.zeros(self.numEMGChannels)
 
         except Exception as e:
             print(e)
@@ -677,3 +674,195 @@ class DelsysEMG:
         # Returning string formatted EMG data
         return averageEMG
         #return emgData
+
+    #-----------------------------------------------------------------------------------
+    # ---- MVC Protocol
+
+    def createMVCNorm(self):
+        """
+        Goes through EMG sensors and creates normalizations values for those sensors.
+        """
+        # MVC Recording
+        self.MVCRecording = True
+
+        # EMG Indexer
+        emgIndexer = 0
+
+        # Checking to see if Delsys EMG is in armed state.
+        if self.TrigBase.GetPipelineState() == "Armed":
+            # Iterating Through Sensor Dict
+            for sensor in self.dataSavingSensorDict.keys():
+                # Indexing Channels
+                for channel in self.dataSavingSensorDict[sensor]['Channels']:
+                    # Checking if EMG in Channel
+                    if 'EMG' in channel:
+                        # Exiting Variable
+                        self.trialExit = False
+
+                        while self.trialExit == False:
+                            # Variables to Hold Max Values
+                            maxVoluntaryContraction = float("-inf")
+                            MVCData = []
+
+                            # Creating Figure
+                            plt.figure()
+
+                            # 3 Trials
+                            for trial in range(3):
+                                # Grabbing Information
+                                attachment = self.dataSavingSensorDict[sensor]['Attachment']
+                                self.mvcGUI(sensor, attachment, trial)
+
+                                # Getting Relavent Data and Clearning Buffer
+                                MVCData.append(self.data[0][emgIndexer])
+                                self.data = []
+
+                                # Rectifying and Sorting Acquired Data
+                                sortedMVCList = np.sort(np.abs(MVCData[trial]), kind = 'quicksort')
+
+                                # Computing MVC
+                                maxVoluntaryContraction = max(maxVoluntaryContraction, np.average(sortedMVCList[-106:-6]))
+
+                                # Plotting and Asking for Input
+                                plt.plot(MVCData[trial])
+
+                            # Showing Plot
+                            plt.xlabel("Samples")
+                            plt.ylabel("Amplitude (mv)")
+                            plt.show()
+
+                            # Closing GUI
+                            self.exitTrialGUI()
+
+                            # Closing Plot
+                            plt.close()
+
+                        # Adding to List and Dictionary
+                        self.normalizeList.append(maxVoluntaryContraction)
+                        self.normalizeDict[sensor] = maxVoluntaryContraction
+
+                    else:
+                        # Appending None
+                        self.normalizeList.append(None)
+
+                    # Increasing EMG Indexer
+                    emgIndexer += 1
+
+            # Setting Status of Normalization to True
+            self.normalize = True
+
+        else:
+            print("System Not Armed")
+
+    def mvcGUI(self, sensor, attachment, trial):
+        """
+        Tkinter GUI for MVC
+        """
+        # Trial Numer
+        self.trialNumber = trial + 1
+        self.trialCounter = 0
+
+        # Loading Dialog Box With Instructions
+        self.root = tk.Tk()
+        self.root.title("MVC Calulcation")
+
+        # Setting Dimensions and Color
+        self.root.geometry("350x250")
+        self.root.configure(bg = "#f5e1fd")
+        self.root.eval('tk::PlaceWindow . center')
+
+        # Trial Number Label
+        self.trialLabel = tk.Label(self.root, text = f"Trial {self.trialNumber}", font = ("Arial", 20, "bold"))
+        self.trialLabel.pack(side=tk.TOP, pady=(25,0))
+
+        # Create a Label
+        self.label = tk.Label(self.root, text = f"Ready for MVC of {sensor} : {attachment}?", font = ("Arial", 14))
+        self.label.pack(side=tk.TOP, pady=(50, 0))
+
+        # Creating Button
+        self.button = tk.Button(self.root, text = "Ready!", command = self.startMVCSequence, font = ("Arial", 14))
+        self.button.pack(side=tk.BOTTOM, pady=(0, 50))
+
+        # Running Even
+        # self.root.mainloop()
+        self.root.wait_window(self.root)
+
+    def startMVCSequence(self):
+        """
+        Starting Sequence for MVC Trial
+        """
+        # Removing Button
+        self.button.pack_forget()
+
+        # Adding Additional Label
+        self.countLabel = tk.Label(self.root, text = "", font = ("Arial", 14))
+        self.countLabel.pack(side=tk.BOTTOM, pady=(0, 50))
+
+        # Data Loop
+        self.MVCDataLoop()
+
+    def MVCDataLoop(self):
+        # Preparation Time
+        if self.trialCounter <= 3:
+            if self.trialCounter == 2: 
+                # Starting Data Collection
+                self.startDataCollection()
+
+            self.countLabel.config(text = f"Prepare to Flex in {3 - self.trialCounter}...")
+            self.trialCounter += 1
+            self.root.after(1000, self.MVCDataLoop)
+
+        # Flex Time
+        elif self.trialCounter <= 8:
+            self.countLabel.config(text = f"FLEX FLEX FLEX for {8 - self.trialCounter}...")
+            self.trialCounter += 1
+            try:
+                self.processData()
+            except Exception as e:
+                print(e)
+                print("Could not process flex MVC data.")
+
+            self.root.after(1000, self.MVCDataLoop)
+
+        # Quit Time
+        else:
+            self.countLabel.config(text = f"Trial {self.trialNumber} Completed")
+            self.stopDataCollection()
+
+            # Closing GUI
+            self.root.after(1000, self.root.destroy())
+
+    def exitTrialGUI(self):
+        """
+        Tkinter Exit GUI
+        """
+        # Loading Dialog Box With Instructions
+        self.root = tk.Tk()
+        self.root.title("MVC Exit")
+
+        # Setting Dimensions and Color
+        self.root.geometry("350x250")
+        self.root.configure(bg = "#f5e1fd")
+        self.root.eval('tk::PlaceWindow . center')
+
+        # Trial Number Label
+        self.MVCQuestion = tk.Label(self.root, text = "Close or Redo MVC?", font = ("Arial", 20, "bold"))
+        self.MVCQuestion.pack(side=tk.TOP, pady=(25,0))
+
+        # Creating Button
+        self.closeButton = tk.Button(self.root, text = "Close!", command = self.closeMVCSequence, font = ("Arial", 14))
+        self.closeButton.pack(side=tk.LEFT, padx=(50, 50))
+
+        # Creating Button
+        self.redoButton = tk.Button(self.root, text = "Redo!", command = self.redoMVCSequence, font = ("Arial", 14))
+        self.redoButton.pack(side=tk.RIGHT, padx=(50, 50))
+
+        # Running Even
+        self.root.wait_window(self.root)
+
+    def closeMVCSequence(self):
+        self.trialExit = True
+        self.root.after(1000, self.root.destroy)
+
+    def redoMVCSequence(self):
+        self.root.after(1000, self.root.destroy)

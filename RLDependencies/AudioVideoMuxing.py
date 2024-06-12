@@ -3,7 +3,7 @@ import os
 from moviepy.editor import AudioFileClip, VideoFileClip
 
 # Combining Audio and Video Files with the Same Name
-def combineAudioVideo(dirPath):
+def combineAudioVideo(dirPath, fps):
     # Setting FilePath
     dirPath = dirPath
 
@@ -27,7 +27,7 @@ def combineAudioVideo(dirPath):
                 outputFile = f"{fileLocation}.mp4"
 
                 # Writting to Output File
-                videoClip.write_videofile(outputFile, codec='libx264', audio_codec='aac')
+                videoClip.write_videofile(outputFile, codec='libx264', audio_codec='aac', fps = fps)
 
                 # Closing Video and Audio File
                 videoClip.close()

@@ -58,6 +58,7 @@ class NoteTakerWidget(QWidget):
         self.addNoteButton.setEnabled(False)
         noteTakerLayout.addWidget(self.addNoteButton)
 
+        """
         # Mark Transition Timepoint Button
         self.markTransitionButton = QPushButton("Mark Transition Time")
         self.markTransitionButton.objectName = "Mark Transition Time Button"
@@ -65,6 +66,7 @@ class NoteTakerWidget(QWidget):
         self.markTransitionButton.setStyleSheet("QPushButton {color: grey;}")
         self.markTransitionButton.setEnabled(False)
         noteTakerLayout.addWidget(self.markTransitionButton)
+        """
         
         # Add in saving button
         noteTakerPanel.setLayout(noteTakerLayout)
