@@ -7,6 +7,9 @@ class TOTD():
         This is the Reinforcement Learning algorithm True Online Temporal Different Learning (Lambda) implemented
         with Selective Kanerva Coding used to create state representations of sensor signals.
 
+        Written by Sonny Jones
+        Version: 2024.05.19
+
         Parameters:
         - studyID: The study ID that will pull from SKC prototypes. Default: None.
         - numInputs: The number of inputs that are accepted by TOTD: Default: 3.
@@ -39,12 +42,16 @@ class TOTD():
         """
         Resets variables for new learning trial.
         """
-        # Resetting Variables After Learning Completion
-        self.featureVector = np.array(np.zeros(self.featureLength))
-        self.weights = np.array(np.zeros(self.featureLength))
-        self.VOld = np.array(np.zeros(self.featureLength))
-        self.eTrace = np.array(np.zeros(self.eTrace.shape))
-        self.loopCount = 0
+        try:
+            # Resetting Variables After Learning Completion
+            self.featureVector = np.array(np.zeros(self.featureLength))
+            self.weights = np.array(np.zeros(self.featureLength))
+            self.VOld = np.array(np.zeros(self.featureLength))
+            self.eTrace = np.array(np.zeros(self.eTrace.shape))
+            self.loopCount = 0
+
+        except:
+            print("Variables Haven't Been Initiated Yet. Learning is Fresh")
 
     # Changing Loading Variable Function
     def setLoadOld(self, attribute):

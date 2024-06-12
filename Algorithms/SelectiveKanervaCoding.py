@@ -9,6 +9,9 @@ class SelectiveKanervaCoding():
         """
         Initialize Selective Kanerva Coding.
 
+        Written by Sonny Jones
+        Version: 2024.05.19
+
         Parameters:
         - numPrototypes: The number of prototypes SKC will build. Default: 5000.
         - numInputs: The number of inputs that SKC will accept. Default: 0.

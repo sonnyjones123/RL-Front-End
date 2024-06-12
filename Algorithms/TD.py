@@ -7,6 +7,9 @@ class TD():
         This is the Reinforcement Learning algorithm True Online Temporal Different Learning (Lambda) implemented
         with Selective Kanerva Coding used to create state representations of sensor signals.
 
+        Written by Sonny Jones
+        Version: 2024.05.19
+
         Parameters:
         - studyID: The study ID that will pull from SKC prototypes. Default: None.
         - numInputs: The number of inputs that are accepted by TOTD: Default: 3.

@@ -103,7 +103,7 @@ def CrossValidation(agent, data, Z, parameters, plot = False, xLimit = None):
             samples = np.linspace(0, iterations, iterations)
             
             # Plotting
-            plt.figure(figsize=(10,6))
+            plt.figure(figsize=(20,10))
             plt.plot(samples, Z, color = 'm', alpha = 0.2)
             plt.plot(samples, predicted, color = 'c')
             plt.plot(samples, actualReturn, 'b', alpha = 0.5)
