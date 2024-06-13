@@ -16,3 +16,9 @@ Algorithms/Prototypes/SwiftTDTesting_input8.npy
 Algorithms/Prototypes/SwiftTDTesting_input10.npy
 Algorithms/Prototypes/CrossVal_input8.npy
 Algorithms/Prototypes/CrossVal_input6040.npy
+Algorithms/AlgorithmTesting.ipynb
+RLDependencies/DataFileHandlerTesting.ipynb
+RLDependencies/DelsysEMGTesting.ipynb
+RLDependencies/MoviePyTesting.ipynb
+RLDependencies/NoteTakingWidgetTesting.ipynb
+RLDependencies/XSensorTesting.ipynb
