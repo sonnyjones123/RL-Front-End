@@ -30,7 +30,7 @@ class XSensorWidget(QWidget):
         self.XSensorForce = XSensorForce(recordingRate = 1000//recordingRate)
         self.sensorsConnected = 0
         self.XSensorControlPanel = self.XSensorPanel()
-        self.sensorDisplayTrack = []
+        self.sensorDisplayTrack = {}
         self.splitter = QSplitter(self)
         self.splitter.addWidget(self.XSensorControlPanel)
         self.layout = QVBoxLayout(self)
@@ -88,45 +88,27 @@ class XSensorWidget(QWidget):
     def XSensorDisplay(self, sensor):
         SensorDisplayPanel = QWidget()
         SensorDisplayLayout = QVBoxLayout()
+        SensorDisplayLayout.setAlignment(Qt.AlignTop)
         SensorDisplayPanel.setFixedSize(220, 620)
 
         # Sensor Display Label
         self.sensorDisplayLabel = QLabel(f"<b>Insole {sensor + 1}</b>", alignment = Qt.AlignCenter)
         self.sensorDisplayLabel.setStyleSheet('QLabel {color: black;}')
         SensorDisplayLayout.addWidget(self.sensorDisplayLabel)
-        
-        # Creating Sensor Grid
-        sensorGridLayout = QGridLayout()
 
         # Creating QLabel array
-        exec(f"self.sensorLabel{sensor} = []")
+        sensorLabel = QLabel()
+        sensorLabel.setAlignment(Qt.AlignCenter)
+        self.sensorDisplayTrack[sensor] = sensorLabel
 
-        # Creating Sensor Display Grid
-        for i in range(self.numRows):
-            rowLabels = []
-            for j in range(self.numCols):
-                sensorWidget = QLabel()
-                sensorWidget.setAutoFillBackground(True)
-                sensorWidget.setStyleSheet("background-color: black;")
-                sensorWidget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                sensorWidget.setMaximumSize(20, 20)
-                sensorWidget.setMinimumSize(20, 20)
-                sensorGridLayout.addWidget(sensorWidget, i, j)
-                rowLabels.append(sensorWidget)
-            exec(f"self.sensorLabel{sensor}.append(rowLabels)")
-        
-        # Setting Size Constraints
-        sensorGridLayout.setHorizontalSpacing(1)
-        sensorGridLayout.setVerticalSpacing(1)
-
-        # Adding Sensor Grid to Layout
-        SensorDisplayLayout.addLayout(sensorGridLayout)
+        # Adding to Sensor Display Panel
+        SensorDisplayLayout.addWidget(sensorLabel)
 
         # Setting Layout as Panel
         SensorDisplayPanel.setLayout(SensorDisplayLayout)
 
         return SensorDisplayPanel
-    
+
     #-----------------------------------------------------------------------------------
     # ---- XSensor Control Callbacks
 
@@ -148,11 +130,11 @@ class XSensorWidget(QWidget):
             # Adding Display
             for sensor in range(self.XSensorForce.numSensors):
                 # Checking if Panel already exists
-                if f"XSensorVisualPanel{sensor}" not in self.sensorDisplayTrack:
-                    # Creating panel
-                    exec(f"self.XSensorVisualPanel{sensor} = self.XSensorDisplay({sensor})")
-                    exec(f"self.splitter.addWidget(self.XSensorVisualPanel{sensor})")
-                    self.sensorDisplayTrack.append(f"XSensorVisualPanel{sensor}")
+                sensorDisplay = self.XSensorDisplay(sensor)
+                self.splitter.addWidget(sensorDisplay)
+
+            # Adding Dummy Data
+            self.updateDisplayInit()
 
         except Exception as e:
             print(e)
@@ -166,6 +148,7 @@ class XSensorWidget(QWidget):
         # Updating Connect Button
         self.connectButton.setEnabled(True)
         self.connectButton.setStyleSheet("color: black")
+
         """
         self.stopButton.setEnabled(True)
         self.stopButton.setStyleSheet("color: black")
@@ -220,53 +203,65 @@ class XSensorWidget(QWidget):
     # ---- XSensor Display Callbacks
 
     # Getting color for display
-    def getColor(self, value):
-        if value > self.maxValue:
-            self.maxValue = value
-        mappedValue = abs((value - self.minValue) / (self.maxValue - self.minValue))
-        return QColor(int(255 * mappedValue), int(255 * (1 - mappedValue)), 0)
+    def getQImage(self, data):
+        # Resetting Normalization
+        self.maxValue = np.max(data) if np.max(data) > self.maxValue else self.maxValue
+        mappedValue = abs((data - self.minValue) / (self.maxValue - self.minValue))
+        
+        # Creating Color Mapping (RGBA)
+        colormap = np.zeros((data.shape[0], data.shape[1], 4), dtype = np.uint8)
+
+        # Applying Mapping
+        colormap[..., 0] = (255 * (1 - mappedValue)).astype(np.uint8)  # Red channel
+        colormap[..., 1] = (255 * (1 - mappedValue)).astype(np.uint8)  # Green channel
+        colormap[..., 2] = 255  # Blue channel (always 255 for blue)
+        colormap[..., 3] = 255  # Alpha channel (fully opaque)
+
+        # Converting to QImage
+        height, width, channels = colormap.shape
+        bytesPerLine = channels * width
+        qImage = QImage(colormap.data, width, height, bytesPerLine, QImage.Format_RGBA8888)
+
+        # Scaling Image
+        return qImage.scaled(220, 620, Qt.KeepAspectRatio)
+    
+    # Updating Display for Example Sizes
+    def updateDisplayInit(self):
+        try:
+            for sensorID, label in self.sensorDisplayTrack.items():
+                # Getting Data From Sensor
+                data = np.zeros((31, 11))
+
+                # Creating Pixmap
+                qImage = self.getQImage(data)
+                pixmap = QPixmap.fromImage(qImage)
+
+                # Setting Pixmap
+                label.setPixmap(pixmap)
+
+        except Exception as e:
+            print(f"Error updating XSensor Display: {e}")
 
     # Display Update Function
     def updateDisplay(self):
         try:
-            # Checking If Caching is Enabled
-            if self.XSensorForce.cache:
-                # Looping Through Number of Sensors
-                for sensor in range(self.XSensorForce.numSensors):
-                    # Looping Through Rows in Sensors
-                    for row in range(self.numRows):
-                        # Looping Through Cols in Sensors
-                        for col in range(self.numCols):
-                            # Creating List to Hold Values
-                            sensorValues = []
+            # Looping Through Each Sensor
+            for sensorID, label in self.sensorDisplayTrack.items():
+                # Getting Data From Sensor
+                data = np.array(self.XSensorForce.data[sensorID])
 
-                            # Looping Through Samples in Buffer
-                            for sample in self.XSensorForce.data[sensor]:
-                                # Appending Sample Sensor Row and Col Value
-                                # TODO: TEST THIS
-                                sensorValues.append(sample[row * self.numCols + col])
+                # Reshapping Data
+                reshappedData = data.reshape(31,11)
 
-                            # Creating and Setting Color
-                            color = self.getColor(np.average(value))
-                            exec(f"self.sensorLabel{sensor}[row][col].setStyleSheet('background-color: {color.name()};')")
+                # Creating Pixmap
+                qImage = self.getQImage(reshappedData)
+                pixmap = QPixmap.fromImage(qImage)
 
-            # Not Caching Update
-            else:
-                # Looping Through Number of Sensors
-                for sensor in range(self.XSensorForce.numSensors):
-                    # Looping Through Rows in Sensors
-                    for row in range(self.numRows):
-                        # Looping Through Cols in Sensors
-                        for col in range(self.numCols):
-                            # Getting Value of Sensor From DataBuffer
-                            value = self.XSensorForce.data[sensor][0][row * self.numCols + col]
+                # Setting Pixmap
+                label.setPixmap(pixmap)
 
-                            # Creating and Setting Color
-                            color = self.getColor(value)
-                            exec(f"self.sensorLabel{sensor}[row][col].setStyleSheet('background-color: {color.name()};')")
         except Exception as e:
-            print(e)
-            print("Could not update XSensor display")
+            print(f"Error updating XSensor Display: {e}")
 
     #-----------------------------------------------------------------------------------
     # ---- Archived

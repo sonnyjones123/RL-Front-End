@@ -139,9 +139,6 @@ class VideoWidget(QWidget):
                 customFileName = f"{fileName}.wav"
 
                 # Creating Complete Path
-                # Issue here, joining the paths incorrectly
-                #completePath = os.path.join(self.filePath, customFileName)
-                # TODO: os.path.join concatentates the paths incorrectly with a \\ instead of /
                 completePath = self.filePath + '/' + customFileName
 
                 # Creating Outlet
@@ -172,7 +169,6 @@ class VideoWidget(QWidget):
     # Frame Saving Function
     def saveFrame(self):
         if self.recording:
-            # resizedFrame = cv2.resize(self.frame, (self.outputWidth, self.outputHeight))
             self.videoWriter.write(self.frame)
 
     # Saving AUdio

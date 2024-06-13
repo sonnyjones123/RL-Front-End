@@ -417,7 +417,9 @@ class DataFileHandler():
 # ---- Queue Class
 
 class Queue(queue.Queue):
-    "Custom Queue subclass with clearning method."
+    "Custom Queue subclass with clearing method."
+    def __init__(self):
+        super().__init__()
 
     def clear(self):
         """
@@ -448,6 +450,16 @@ class Queue(queue.Queue):
         except Exception as e:
             print(f"Error clearing queue: {e}")
 
+def clearQueue(queue):
+        """
+        Clears all items from the queue.
+        """
+        while not queue.empty():
+            try:
+                queue.get_nowait()
+            except queue.Empty:
+                break
+
 #-----------------------------------------------------------------------------------
 # ---- Threading Module For Commands and Saving
 
@@ -473,6 +485,7 @@ commandMap = {
     'addTransitionTime' : dataHandler.addTransitionTime,
     'plotTrialData' : dataHandler.plotTrialDataThread,
     'closeFile' : dataHandler.closeFile,
+    'cleanUp' : dataHandler.closeFile,
     'stop' : stopEvent.set
 }
 
@@ -538,7 +551,7 @@ def processQueue():
 
                 # Clearing Queue If Command is Close File
                 if functionName == 'closeFile':
-                    commandQueue.clear()
+                    clearQueue(commandQueue)
 
             except:
                 print(f"Error executing command: {functionName}")

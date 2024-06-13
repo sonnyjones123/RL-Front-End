@@ -557,7 +557,7 @@ class MyWidget(QMainWindow):
         # Updating VideoTimer 
         self.videoTimer += self.recordingRate
 
-        print(f"Camera Capture Processing Completed in {time.time() - tic}")
+        #print(f"Camera Capture Processing Completed in {time.time() - tic}")
     
     # Function to add and remove sensors from the sensor list on button press
     def button_grid_press(self, value):
@@ -605,7 +605,7 @@ class MyWidget(QMainWindow):
         try:
             if self.dataCommandSender is not None:
                 command = {
-                        'function' : 'closeFile',
+                        'function' : 'cleanUp',
                         'params' : {}
                 }
                 self.dataCommandSender.sendCommand(json.dumps(command))
