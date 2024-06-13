@@ -3,7 +3,7 @@ This file is meant to extract steps from multiple EMG channels using the heel st
 from the XSensor pressure insole.
 
 Written by Grange Simpson
-Version: 2024.05.21
+Version: 2024.06.12
 
 Usage: Run the file.
 """
@@ -12,17 +12,63 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 from scipy import interpolate
+from math import factorial
 
 
 class Step_Extraction_Stats:
-    def __init__(self):
-        self.peakSpacing = 2000
+    def __init__(self, windowSize):
+        self.peakSpacing = 1000
 
         # Variables to use for testing
         self.upSampleData = 0
         self.upSampledPressDataSlope = 0
         self.pressDataInfl = 0
+
+        self.smoothWindowSize = windowSize
     
+    """
+    Savitzky golay algorithm is used to smooth out the very spiky upsampled data using a running average
+    y : array_like, shape (N,)
+        the values of the time history of the signal.
+    window_size : int
+        the length of the window. Must be an odd integer number.
+    order : int
+        the order of the polynomial used in the filtering.
+        Must be less then `window_size` - 1.
+    deriv: int
+        the order of the derivative to compute (default = 0 means only smoothing)
+    Returns
+    -------
+    ys : ndarray, shape (N)
+        the smoothed signal (or it's n-th derivative).
+    """
+    def savitzky_golay(self, y, window_size, order, deriv=0, rate=1):
+
+        try:
+            window_size = np.abs(int(window_size))
+            order = np.abs(int(order))
+
+        except ValueError as msg:
+            raise ValueError("window_size and order have to be of type int")
+        
+        if window_size % 2 != 1 or window_size < 1:
+            raise TypeError("window_size size must be a positive odd number")
+        
+        if window_size < order + 2:
+            raise TypeError("window_size is too small for the polynomials order")
+        
+        order_range = range(order+1)
+        half_window = (window_size -1) // 2
+        # Precompute coefficients
+        b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+        m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+        # Pad the signal at the extremes with
+        # Values taken from the signal itself
+        firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+        lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+        y = np.concatenate((firstvals, y, lastvals))
+        
+        return np.convolve( m[::-1], y, mode='valid')
 
     """
     Upsample the heel data from 10 Hz to ~1926 Hz by filling the lower sampled data with NaNs 
@@ -67,25 +113,29 @@ class Step_Extraction_Stats:
 
         return peaks
     
-    def find_bin_inflections(self, inputSlope):
+    def find_bin_inflections(self, inputSlope):  
+
         slopeData = np.array(inputSlope)
+
+        slopeData = self.savitzky_golay(slopeData, self.smoothWindowSize, 3)
+
         # Removing unloading events from the data
         slopeData[slopeData < 0] = 0
-
         # Removing small loading noise from the data
         # TODO: check with Kylee what a better number would be for removing small loading noise than meanPeakHeight / 15
         # Finding peaks to get the average peak height, will likely need to adjust for higher sampling rate
         pressDataPeakInds = self.find_bin_peaks(inputSlope)
         meanPeakHeight = np.mean(inputSlope[pressDataPeakInds])
 
-        slopeData[slopeData < meanPeakHeight / 20] = 0 
+        slopeData[slopeData < meanPeakHeight / 15] = 0 
+
 
         indexArr = []
         # Only save the indexs of inflection points where the difference in slope is small for the current point then large for the next point
         # indicating an inflection point
         for x in range(len(slopeData) - 2):
             if (slopeData[x] == 0 and slopeData[x + 1] > 0):
-                indexArr.append(x + 1)
+                indexArr.append(x)
 
         meanStepLength = np.mean(np.diff(indexArr))
 
@@ -98,7 +148,7 @@ class Step_Extraction_Stats:
                 
                 #print(len(indexArrCop))
                 #print(len(indexArr))
-                del indexArrCop[(x + 1) - deleteIter]
+                del indexArrCop[(x) - deleteIter]
                 deleteIter += 1
 
         return indexArrCop
@@ -119,6 +169,7 @@ class Step_Extraction_Stats:
         downsampled_signal = interpolation_function(targetIndices)
         return downsampled_signal
 
+
     """
     This function takes binned XSensor data and uses the heel data to segment out the steps from the EMG
     Only does left or right data, not both at the same time
@@ -130,7 +181,16 @@ class Step_Extraction_Stats:
         # Upsampling the XSensor data for now since it's at 10 Hz and the EMG is at 1926 Hz
         upsampleFactor = np.round((len(EMGStepsDf[emgCols[0]]) / len(pressureStepsDf[binToParseOn]))).astype(int)
 
-        upSampledHeelData = self.upsample_data(pressureStepsDf[binToParseOn], upsampleFactor)
+        # Normalizing the input pressure data
+        # Taking the mean of the top 50 minimums to remove most of the baseline shift.
+        pressData = pressureStepsDf[binToParseOn]
+        meanMinSortedPressData = np.mean(np.sort(pressData)[0:50])
+
+        pressData = pressData - meanMinSortedPressData
+
+        pressData = pressData / np.max(pressData)
+
+        upSampledHeelData = self.upsample_data(pressData, upsampleFactor)
         self.upSampleData = upSampledHeelData
 
         # Turning the upsampled data into slopes by taking the difference in between each point
@@ -175,8 +235,3 @@ class Step_Extraction_Stats:
         outDf = pd.DataFrame.from_dict(stepsDict)
 
         return outDf
-    
-
-if __name__ == "__main__":
-    stepExtr = Step_Extraction_Stats()
-
